@@ -328,6 +328,15 @@ private struct EditablePostIt: View, Equatable {
                         }.buttonStyle(.plain).accessibilityLabel(color.label)
                             .accessibilityAddTraits(note.color == color ? .isSelected : [])
                     }
+                    Button(action: togglePriority) {
+                        HStack(spacing: 5) {
+                            PrioritySticker(size: 14).opacity(note.isPriority ? 1 : 0.35)
+                            Text(L("Priorità", "Priority")).font(.system(size: 11, weight: .medium))
+                        }
+                    }.buttonStyle(.plain).padding(.leading, 8)
+                        .help(priorityActionTitle)
+                        .accessibilityLabel(priorityActionTitle)
+                        .accessibilityAddTraits(note.isPriority ? .isSelected : [])
                     Spacer()
                     Button(action: toggleCompleted) {
                         Label(note.completedAt == nil ? L("Completa", "Complete") : L("Riapri", "Reopen"), systemImage: note.completedAt == nil ? "checkmark.circle" : "arrow.uturn.backward")
@@ -351,7 +360,8 @@ private struct EditablePostIt: View, Equatable {
                     }.frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
                         .padding(.horizontal, 24).padding(.bottom, 18)
                         .accessibilityHidden(true)
-                        .overlay(PaperOpenArea(id: note.id, title: collapsedLabel, color: note.color, open: expand))
+                        .overlay(PaperOpenArea(id: note.id, title: collapsedLabel, color: note.color, open: expand,
+                                               contextTitle: priorityActionTitle, contextAction: togglePriority))
             }
         }
         .padding(.horizontal, isExpanded ? 24 : 0)
@@ -361,6 +371,10 @@ private struct EditablePostIt: View, Equatable {
         // Shadow only the paper image: shadowing the whole card forces an offscreen pass
         // over every text view and control on each redraw.
         .background(PaperSurface(color: note.color).shadow(color: .black.opacity(0.16), radius: 3, x: 0, y: -2))
+        // Stuck on the top-left corner, half over the edge, clear of the title.
+        .overlay(alignment: .topLeading) {
+            if note.isPriority { PrioritySticker().offset(x: -6, y: -6).allowsHitTesting(false) }
+        }
         .onChange(of: linkError) { _, message in
             if message != nil { NSApp.activate(ignoringOtherApps: true) }
         }
@@ -372,9 +386,19 @@ private struct EditablePostIt: View, Equatable {
     private var hasNextStep: Bool { !note.trimmedNextStep.isEmpty }
 
     private var collapsedLabel: String {
-        let title = note.title.isEmpty ? L("Nuovo lavoro", "New note") : note.title
+        var title = note.title.isEmpty ? L("Nuovo lavoro", "New note") : note.title
+        if note.isPriority { title = L("Priorità: ", "Priority: ") + title }
         guard let staleDays else { return title }
         return L("\(title), fermo da \(staleDays) giorni", "\(title), untouched for \(staleDays) days")
+    }
+
+    private var priorityActionTitle: String {
+        note.isPriority ? L("Togli l’adesivo di priorità", "Remove priority sticker")
+                        : L("Metti l’adesivo di priorità", "Add priority sticker")
+    }
+
+    private func togglePriority() {
+        edit(L("Priorità", "Priority")) { $0.priority = $0.isPriority ? nil : true }
     }
 
     // "In attesa" can ring later: macOS shows a notification that opens this post-it.

@@ -158,11 +158,16 @@ struct PostItWidgetView: View {
                                         if single { details(note) }
                                     }
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.leading, 18).padding(.trailing, canAdvance ? 40 : 18).padding(.top, 9)
+                                    .padding(.leading, note.isPriority ? 30 : 18).padding(.trailing, canAdvance ? 40 : 18).padding(.top, 9)
                                     .frame(height: layout.paperHeight, alignment: .top)
                                     .background(PaperSurface(color: note.color))
+                                    .overlay(alignment: .topLeading) {
+                                        if note.isPriority { PrioritySticker(size: 18).offset(x: 6, y: 5) }
+                                    }
                                     .contentShape(Rectangle())
                                 }.buttonStyle(.plain)
+                                    .accessibilityLabel((note.isPriority ? L("Priorità: ", "Priority: ") : "")
+                                        + (note.title.isEmpty ? L("Nuovo lavoro", "New note") : note.title))
                                 if canAdvance {
                                     Button(intent: AdvancePostItStep(note: note)) {
                                         Image(systemName: "arrow.turn.left.up")

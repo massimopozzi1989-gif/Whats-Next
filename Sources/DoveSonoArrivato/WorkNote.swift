@@ -46,6 +46,10 @@ struct WorkNote: Identifiable, Codable, Equatable {
     var history: [StepEntry]?
     // When to be reminded about an "In attesa" note. Optional for older files.
     var reminderAt: Date?
+    // The priority sticker. Optional so files from earlier versions still decode.
+    var priority: Bool?
+
+    var isPriority: Bool { priority == true }
 
     var steps: [StepEntry] { history ?? [] }
 

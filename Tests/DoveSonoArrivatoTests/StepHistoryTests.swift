@@ -67,3 +67,17 @@ final class StepHistoryTests: XCTestCase {
         XCTAssertEqual(store.applyWidgetActions(from: queue), 0)
     }
 }
+
+final class PriorityStickerTests: XCTestCase {
+    func testPriorityIsOptionalAndSurvivesSaving() throws {
+        let legacy = #"[{"id":"6F1C2A44-2B7E-4B39-9A61-3E5E0C1E9A10","title":"Vecchia","progress":"","action":"Prossimo passo","nextStep":"","conclusion":"","color":"yellow","updatedAt":700000000}]"#
+        let old = try JSONDecoder().decode([WorkNote].self, from: Data(legacy.utf8))
+        XCTAssertFalse(old[0].isPriority)
+
+        var note = WorkNote(); note.title = "Urgente"; note.priority = true
+        let decoded = try JSONDecoder().decode(WorkNote.self, from: JSONEncoder().encode(note))
+        XCTAssertTrue(decoded.isPriority)
+        note.priority = nil
+        XCTAssertFalse(String(decoding: try JSONEncoder().encode(note), as: UTF8.self).contains("priority"))
+    }
+}

@@ -25,6 +25,7 @@ Switching between projects costs the most in the first ten minutes back: rereadi
 - **One note per project, stacked like paper.** Each sheet shows only its title strip; click anywhere on it to open. Drag a closed sheet to reorder the stack.
 - **Done moves you forward.** Click **Done** (or press **⌘↩**) and your next step becomes “Where I left off”, ready for the next one. The previous point is kept, dated, in the note’s **Path**.
 - **Next step or waiting for.** Mark what you are waiting on and set a reminder — in an hour, tomorrow at 9, Monday… A macOS notification opens that note when it’s time.
+- **A sticker for what matters.** Put a red priority sticker on any note — from the open note or with a right‑click — and it shows on the paper in the panel and in the widget.
 - **Stale notes get a clock.** Notes you haven’t touched for 7 days (3, 14, 30 or never — your choice) show how long they’ve been sitting.
 - **A widget that does something.** Small, medium and large widgets show your stack in order; tap ↰ on a note to mark its step done without opening the app.
 - **Out of your way.** Lives in the menu bar, opens with **⌃⌥Space** from any app, and never steals focus: the app you were using keeps its menu bar and gets the keyboard back when you press Esc.
