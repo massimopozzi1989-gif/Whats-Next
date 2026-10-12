@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What’s Next? — paper notes for picking up where you left off</title>
+<meta name="description" content="A free, open-source macOS menu-bar app: one paper note per project with where you left off and the next step. Done moves you forward. Widget, reminders, no account.">
+<meta property="og:title" content="What’s Next? for macOS">
+<meta property="og:description" content="Where did I leave off, and what comes next? Paper notes in your menu bar.">
+<meta property="og:image" content="https://massimopozzi1989-gif.github.io/Whats-Next/assets/social-en.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="assets/icon-256.png">
+<link rel="apple-touch-icon" href="assets/icon-256.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@500&family=Kalam:wght@300;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --desk: #DFE5EC;
+  --desk-deep: #CDD6E0;
+  --ink: #303830;
+  --ink-soft: #5B6560;
+  --yellow: #FAE8A6;
+  --peach: #FACFB8;
+  --mint: #C9E3C7;
+  --blue: #C7DEF2;
+  --lilac: #E0CFF7;
+  --hand: "Noteworthy", "Kalam", "Bradley Hand", cursive;
+  --body: "Atkinson Hyperlegible", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --sheet-shadow: 0 -2px 6px rgba(20, 30, 40, .14);
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: radial-gradient(120% 80% at 70% 0%, #EEF2F6 0%, var(--desk) 55%, var(--desk-deep) 100%) fixed;
+  color: var(--ink);
+  font: 17px/1.55 var(--body);
+}
+html[data-lang="en"] [lang="it"], html[data-lang="it"] [lang="en"] { display: none; }
+a { color: inherit; }
+:focus-visible { outline: 3px solid #3B6EA8; outline-offset: 3px; border-radius: 4px; }
+.wrap { width: min(1080px, 100% - 32px); margin-inline: auto; }
+
+/* Top bar */
+.top { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
+.mark { font: 700 26px/1 var(--hand); text-decoration: none; display: inline-flex; align-items: center; gap: 10px; }
+.top nav { display: flex; gap: 8px; align-items: center; }
+.lang { display: inline-flex; background: rgba(255,255,255,.6); border-radius: 999px; padding: 3px; }
+.lang button {
+  border: 0; background: transparent; font: 700 13px/1 var(--body); padding: 7px 11px; border-radius: 999px;
+  color: var(--ink-soft); cursor: pointer;
+}
+.lang button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.gh { font: 700 13px/1 var(--body); text-decoration: none; padding: 10px 14px; border-radius: 999px; background: rgba(255,255,255,.6); }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: 1.05fr .95fr; gap: 56px; align-items: center; padding: 40px 0 72px; }
+.hero h1 { font: 700 clamp(44px, 6.4vw, 78px)/1.02 var(--hand); margin: 0 0 18px; letter-spacing: -.5px; }
+.hero h1 .q { display: block; color: var(--ink-soft); font-weight: 300; font-size: .62em; margin-bottom: 6px; }
+.lede { font-size: 19px; max-width: 34ch; margin: 0 0 28px; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.btn {
+  display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font: 700 16px/1 var(--body);
+  padding: 15px 22px; border-radius: 12px; background: var(--ink); color: #fff;
+}
+.btn:hover { background: #1F2620; }
+.btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px rgba(48,56,48,.25); }
+.btn.ghost:hover { box-shadow: inset 0 0 0 2px var(--ink); }
+.req { font-size: 14px; color: var(--ink-soft); margin-top: 14px; }
+
+/* The live note */
+.demo { position: relative; }
+.pad { position: relative; isolation: isolate; }
+.sheet {
+  position: relative; padding: 30px 30px 40px; background: var(--yellow) url(assets/paper-yellow.webp) center / 100% 100%;
+  box-shadow: var(--sheet-shadow); border-radius: 2px 2px 26px 2px;
+}
+.sheet h2 { font: 700 30px/1.15 var(--hand); margin: 0 0 18px; }
+.field-label { font: 700 11px/1 var(--body); letter-spacing: .02em; color: var(--ink-soft); margin: 0 0 4px; }
+.hand { font: 300 23px/1.3 var(--hand); margin: 0; min-height: 1.3em; }
+.row { display: flex; justify-content: space-between; align-items: center; margin: 22px 0 4px; }
+.pill { font: 700 12px/1 var(--body); display: inline-flex; align-items: center; gap: 6px; }
+.done {
+  font: 700 13px/1 var(--body); color: var(--ink); background: rgba(255,255,255,.55); border: 0; cursor: pointer;
+  padding: 9px 12px; border-radius: 999px; display: inline-flex; gap: 6px; align-items: center;
+}
+.done:hover { background: #fff; }
+.done:disabled { opacity: .4; cursor: default; }
+.path { margin: 20px 0 0; padding: 14px 0 0; border-top: 1px dashed rgba(48,56,48,.25); list-style: none; }
+.path li { display: flex; gap: 12px; align-items: baseline; font: 300 17px/1.35 var(--hand); }
+.path time { font: 500 11px/1 var(--mono); color: var(--ink-soft); min-width: 44px; }
+.under {
+  position: absolute; inset: 14px -10px -14px 10px; z-index: -1; transform: rotate(2.2deg);
+  background: var(--mint) url(assets/paper-mint.webp) center / 100% 100%; box-shadow: var(--sheet-shadow);
+}
+.moving { animation: rise .55s cubic-bezier(.2,.8,.2,1); }
+@keyframes rise { from { transform: translateY(70px); opacity: 0; } to { transform: none; opacity: 1; } }
+.hint { font: 300 18px/1.2 var(--hand); color: var(--ink-soft); margin-top: 18px; text-align: right; }
+
+/* Sections */
+section { padding: 64px 0; }
+.eyebrow { font: 700 13px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 12px; }
+h2.title { font: 700 clamp(32px, 4.2vw, 46px)/1.08 var(--hand); margin: 0 0 14px; }
+.sub { max-width: 60ch; margin: 0 0 32px; }
+.shot { display: block; width: 100%; height: auto; border-radius: 18px; box-shadow: 0 24px 60px -30px rgba(20,30,40,.45); }
+
+/* Feature stack: sheets overlap like the app, click a title to open */
+.stack { max-width: 720px; }
+.stack details { position: relative; margin-top: -16px; box-shadow: var(--sheet-shadow); background-size: 100% 100%; }
+.stack details:first-child { margin-top: 0; }
+.stack details:last-child { border-bottom-right-radius: 22px; }
+.stack summary {
+  list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 26px 30px; font: 700 26px/1.1 var(--hand);
+}
+.stack summary::-webkit-details-marker { display: none; }
+.stack summary::after { content: "⌄"; font: 400 20px/1 var(--body); opacity: .5; transition: transform .2s; }
+.stack details[open] summary::after { transform: rotate(180deg); }
+.stack details p { margin: -10px 26px 0; padding-bottom: 34px; max-width: 58ch; }
+.y { background: var(--yellow) url(assets/paper-yellow.webp); }
+.p { background: var(--peach) url(assets/paper-peach.webp); }
+.m { background: var(--mint) url(assets/paper-mint.webp); }
+.b { background: var(--blue) url(assets/paper-blue.webp); }
+.l { background: var(--lilac) url(assets/paper-lilac.webp); }
+
+/* Keyboard */
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.key { background: rgba(255,255,255,.62); border-radius: 14px; padding: 18px; }
+kbd {
+  display: inline-block; font: 500 15px/1 var(--mono); padding: 8px 10px; border-radius: 8px; background: #fff;
+  box-shadow: 0 2px 0 rgba(48,56,48,.25), inset 0 0 0 1px rgba(48,56,48,.12); margin-bottom: 10px;
+}
+.key p { margin: 0; }
+
+/* Privacy */
+.privacy { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; }
+.privacy .hand-big { font: 700 clamp(28px, 3.4vw, 38px)/1.2 var(--hand); margin: 0; }
+code, .path-code { font: 500 14px/1.5 var(--mono); }
+.path-code { display: inline-block; background: rgba(255,255,255,.6); padding: 2px 6px; border-radius: 6px; word-break: break-all; }
+
+/* Open source */
+pre {
+  background: var(--ink); color: #E9EFE9; padding: 20px 22px; border-radius: 14px; overflow-x: auto;
+  font: 500 14px/1.7 var(--mono); margin: 0 0 18px;
+}
+pre .c { color: #9DB0A0; }
+
+footer { padding: 40px 0 56px; font-size: 14px; color: var(--ink-soft); border-top: 1px solid rgba(48,56,48,.14); }
+footer p { margin: 4px 0; }
+
+@media (max-width: 860px) {
+  .hero { grid-template-columns: 1fr; gap: 40px; padding-top: 16px; }
+  .privacy { grid-template-columns: 1fr; gap: 16px; }
+  section { padding: 48px 0; }
+}
+@media (max-width: 480px) {
+  body { font-size: 16px; }
+  .sheet { padding: 24px 22px 34px; }
+  .stack summary { font-size: 22px; padding: 16px 20px 28px; }
+  .stack details p { margin-inline: 20px; }
+  .gh span { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .moving { animation: none; }
+  .stack summary::after { transition: none; }
+}
+</style>
+</head>
+<body>
+<header class="wrap top">
+  <a class="mark" href="#"><img src="assets/icon-256.png" alt="" width="34" height="34">What’s Next?</a>
+  <nav>
+    <div class="lang" role="group" aria-label="Language">
+      <button type="button" data-set="en" aria-pressed="true">EN</button>
+      <button type="button" data-set="it" aria-pressed="false">IT</button>
+    </div>
+    <a class="gh" href="https://github.com/massimopozzi1989-gif/Whats-Next">GitHub <span>★</span></a>
+  </nav>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <div>
+      <h1>
+        <span lang="en"><span class="q">Where did I leave off?</span>What’s next.</span>
+        <span lang="it"><span class="q">Dove sono arrivato?</span>Qual è il prossimo passo.</span>
+      </h1>
+      <p class="lede">
+        <span lang="en">One paper note per project, in your Mac’s menu bar. It remembers the point you stopped at and the step that comes next, so getting back to work takes a glance.</span>
+        <span lang="it">Un foglio di carta per ogni lavoro, nella barra dei menu del Mac. Ricorda il punto in cui ti sei fermato e il passo successivo, così per ripartire basta uno sguardo.</span>
+      </p>
+      <div class="cta">
+        <a class="btn" href="https://github.com/massimopozzi1989-gif/Whats-Next/releases/latest">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1v9m0 0L4.5 6.5M8 10l3.5-3.5M2 13.5h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span lang="en">Download for macOS</span><span lang="it">Scarica per macOS</span>
+        </a>
+        <a class="btn ghost" href="https://github.com/massimopozzi1989-gif/Whats-Next">
+          <span lang="en">Source code</span><span lang="it">Codice sorgente</span>
+        </a>
+      </div>
+      <p class="req">
+        <span lang="en">Free and open source · macOS 14 or later · Apple silicon and Intel</span>
+        <span lang="it">Gratis e open source · macOS 14 o successivo · Apple silicon e Intel</span>
+      </p>
+    </div>
+
+    <div class="demo">
+      <div class="pad" aria-live="polite">
+      <div class="under" aria-hidden="true"></div>
+      <article class="sheet">
+        <h2><span lang="en">Thesis — chapter 3</span><span lang="it">Tesi — capitolo 3</span></h2>
+        <p class="field-label"><span lang="en">Where I left off</span><span lang="it">Dove sono arrivato</span></p>
+        <p class="hand" id="progress"></p>
+        <div class="row">
+          <span class="pill">→ <span lang="en">Next step</span><span lang="it">Prossimo passo</span></span>
+          <button class="done" id="done" type="button">↰ <span lang="en">Done</span><span lang="it">Fatto</span></button>
+        </div>
+        <p class="hand" id="next"></p>
+        <ol class="path" id="path" hidden></ol>
+      </article>
+      </div>
+      <p class="hint"><span lang="en">Try it: press Done ↑</span><span lang="it">Prova: premi Fatto ↑</span></p>
+    </div>
+  </div>
+
+  <section class="wrap" id="look">
+    <p class="eyebrow"><span lang="en">The panel</span><span lang="it">Il pannello</span></p>
+    <h2 class="title"><span lang="en">Your stack, one shortcut away.</span><span lang="it">La tua pila, a una scorciatoia di distanza.</span></h2>
+    <p class="sub">
+      <span lang="en">Press ⌃⌥Space from any app. Every project shows just its title strip; click one to open it, drag it to reorder. The panel never takes focus away from the app you were in.</span>
+      <span lang="it">Premi ⌃⌥Spazio da qualsiasi app. Di ogni lavoro vedi solo la fascia del titolo: un clic lo apre, trascinandolo cambi l’ordine. Il pannello non toglie mai il focus all’app che stavi usando.</span>
+    </p>
+    <img class="shot" lang="en" src="assets/hero-en.png" width="1600" height="1000" loading="lazy" alt="The What’s Next? panel with five colored paper notes; the first is open with Where I left off, Next step and Done.">
+    <img class="shot" lang="it" src="assets/hero-it.png" width="1600" height="1000" loading="lazy" alt="Il pannello di What’s Next? con cinque post-it colorati; il primo è aperto con Dove sono arrivato, Prossimo passo e Fatto.">
+  </section>
+
+  <section class="wrap" id="features">
+    <p class="eyebrow"><span lang="en">What it does</span><span lang="it">Cosa fa</span></p>
+    <h2 class="title"><span lang="en">Open a sheet.</span><span lang="it">Apri un foglio.</span></h2>
+    <p class="sub"><span lang="en">Just like in the app: each sheet shows its title, click to read the rest.</span><span lang="it">Proprio come nell’app: ogni foglio mostra il titolo, clicca per leggere il resto.</span></p>
+    <div class="stack">
+      <details class="y" open>
+        <summary><span lang="en">Done moves you forward</span><span lang="it">Fatto ti porta avanti</span></summary>
+        <p><span lang="en">Press Done or ⌘↩: the next step becomes “Where I left off” and the line is free for the next one. Nothing is lost — earlier points stay in the note’s Path, with their dates.</span>
+        <span lang="it">Premi Fatto o ⌘↩: il prossimo passo diventa “Dove sono arrivato” e la riga è libera per quello dopo. Non si perde niente: i punti precedenti restano nel Percorso del foglio, con la data.</span></p>
+      </details>
+      <details class="p">
+        <summary><span lang="en">Waiting for, with a reminder</span><span lang="it">In attesa, con promemoria</span></summary>
+        <p><span lang="en">Switch a note to “Waiting for”, write what you’re waiting on and pick when to check again: in an hour, tomorrow at 9, Monday. The notification opens that very note.</span>
+        <span lang="it">Passa un foglio su “In attesa”, scrivi cosa aspetti e scegli quando ricontrollare: tra un’ora, domani alle 9, lunedì. La notifica apre proprio quel foglio.</span></p>
+      </details>
+      <details class="m">
+        <summary><span lang="en">A clock on what’s gone quiet</span><span lang="it">Un orologio su ciò che è fermo</span></summary>
+        <p><span lang="en">Notes untouched for a week show how many days they’ve been sitting. Choose 3, 7, 14 or 30 days — or never. Notes you’re deliberately waiting on are left alone.</span>
+        <span lang="it">I fogli non toccati da una settimana mostrano da quanti giorni sono fermi. Scegli 3, 7, 14 o 30 giorni, oppure mai. I lavori che stai aspettando apposta non vengono segnalati.</span></p>
+      </details>
+      <details class="b">
+        <summary><span lang="en">A widget with a Done button</span><span lang="it">Un widget con il tasto Fatto</span></summary>
+        <p><span lang="en">Small, medium and large widgets show your stack in the same order as the app. Tap ↰ on a note to mark its step done without opening anything; tap the paper to start writing.</span>
+        <span lang="it">Widget piccolo, medio e grande con la pila nello stesso ordine dell’app. Tocca ↰ su un foglio per segnare fatto il passo senza aprire nulla; tocca la carta per scrivere.</span></p>
+      </details>
+      <details class="l">
+        <summary><span lang="en">Folders, links and undo</span><span lang="it">Cartelle, link e annulla</span></summary>
+        <p><span lang="en">Attach a project folder or URL to each note and open it in one click. ⌘Z undoes typing and every action — Done, color, reminders, complete. English and Italian, switchable live.</span>
+        <span lang="it">Collega a ogni foglio una cartella o un URL e aprilo con un clic. ⌘Z annulla la scrittura e ogni azione: Fatto, colore, promemoria, completa. Italiano e inglese, da cambiare al volo.</span></p>
+      </details>
+    </div>
+  </section>
+
+  <section class="wrap" id="keyboard">
+    <p class="eyebrow"><span lang="en">Keyboard</span><span lang="it">Tastiera</span></p>
+    <h2 class="title"><span lang="en">Hands stay on the keys.</span><span lang="it">Le mani restano sui tasti.</span></h2>
+    <div class="keys">
+      <div class="key"><kbd>⌃⌥Space</kbd><p><span lang="en">Show or hide the panel, from any app</span><span lang="it">Mostra o nasconde il pannello, da qualsiasi app</span></p></div>
+      <div class="key"><kbd>⌘↩</kbd><p><span lang="en">Done: move the next step up</span><span lang="it">Fatto: porta su il prossimo passo</span></p></div>
+      <div class="key"><kbd>⌘N</kbd><p><span lang="en">New note</span><span lang="it">Nuovo post-it</span></p></div>
+      <div class="key"><kbd>⌘Z</kbd><p><span lang="en">Undo anything on the open note</span><span lang="it">Annulla qualsiasi cosa sul foglio aperto</span></p></div>
+      <div class="key"><kbd>Esc</kbd><p><span lang="en">Hide, and return to your app</span><span lang="it">Nascondi e torna alla tua app</span></p></div>
+    </div>
+  </section>
+
+  <section class="wrap privacy" id="privacy">
+    <p class="hand-big">
+      <span lang="en">No account. No network. No analytics. Just a file on your Mac.</span>
+      <span lang="it">Nessun account. Nessuna rete. Nessuna statistica. Solo un file sul tuo Mac.</span>
+    </p>
+    <p>
+      <span lang="en">Your notes are a plain JSON file at</span><span lang="it">Le note sono un semplice file JSON in</span>
+      <span class="path-code">~/Library/Application Support/DoveSonoArrivato/notes.json</span>,
+      <span lang="en">saved atomically a moment after you stop typing. If it can’t be read, the app keeps the original and refuses to overwrite it.</span>
+      <span lang="it">salvato in modo atomico appena smetti di scrivere. Se non fosse leggibile, l’app conserva l’originale e non lo sovrascrive.</span>
+    </p>
+  </section>
+
+  <section class="wrap" id="source">
+    <p class="eyebrow"><span lang="en">Open source · MIT</span><span lang="it">Open source · MIT</span></p>
+    <h2 class="title"><span lang="en">Built natively, built in the open.</span><span lang="it">Nativa, e aperta.</span></h2>
+    <p class="sub">
+      <span lang="en">SwiftUI inside an AppKit panel, native text editors, a WidgetKit extension and paper textures rendered in Blender. Read it, fork it, send a pull request.</span>
+      <span lang="it">SwiftUI dentro un pannello AppKit, editor di testo nativi, un’estensione WidgetKit e carta renderizzata in Blender. Leggilo, fanne un fork, proponi modifiche.</span>
+    </p>
+<pre><code>git clone https://github.com/massimopozzi1989-gif/Whats-Next.git
+cd Whats-Next
+swift test                 <span class="c"># tests</span>
+zsh scripts/build-app.sh   <span class="c"># app + widget (needs Xcode and XcodeGen)</span></code></pre>
+    <div class="cta">
+      <a class="btn" href="https://github.com/massimopozzi1989-gif/Whats-Next/releases/latest"><span lang="en">Download for macOS</span><span lang="it">Scarica per macOS</span></a>
+      <a class="btn ghost" href="https://github.com/massimopozzi1989-gif/Whats-Next/issues"><span lang="en">Suggest an idea</span><span lang="it">Proponi un’idea</span></a>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap">
+  <p>© 2026 Massimo Pozzi · <a href="https://github.com/massimopozzi1989-gif/Whats-Next/blob/main/LICENSE">MIT License</a></p>
+  <p><span lang="en">Post-it® is a trademark of 3M. What’s Next? is not affiliated with or endorsed by 3M.</span><span lang="it">Post-it® è un marchio di 3M. What’s Next? non è affiliato né approvato da 3M.</span></p>
+</footer>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var steps = {
+    en: { start: "Drafted section 3.1", next: ["Rewrite the intro to 3.2", "Check the sources for the 1998 study", "Send chapter 3 to my supervisor", "Celebrate with a coffee"] },
+    it: { start: "Bozza del paragrafo 3.1", next: ["Riscrivere l’introduzione del 3.2", "Controllare le fonti dello studio del 1998", "Mandare il capitolo 3 al relatore", "Festeggiare con un caffè"] }
+  };
+  var state = { index: 0, path: [] };
+  var progress = document.getElementById("progress");
+  var next = document.getElementById("next");
+  var path = document.getElementById("path");
+  var done = document.getElementById("done");
+
+  function lang() { return root.getAttribute("data-lang"); }
+  function current() { return state.index === 0 ? steps[lang()].start : steps[lang()].next[state.index - 1]; }
+  function render() {
+    var list = steps[lang()].next;
+    progress.textContent = current();
+    next.textContent = list[state.index] || "";
+    done.disabled = !list[state.index];
+    path.hidden = state.path.length === 0;
+    path.innerHTML = "";
+    state.path.slice().reverse().forEach(function (i) {
+      var li = document.createElement("li");
+      var t = document.createElement("time");
+      t.textContent = lang() === "it" ? "oggi" : "today";
+      li.appendChild(t);
+      li.appendChild(document.createTextNode(i === 0 ? steps[lang()].start : steps[lang()].next[i - 1]));
+      path.appendChild(li);
+    });
+  }
+  done.addEventListener("click", function () {
+    if (!steps[lang()].next[state.index]) return;
+    state.path.push(state.index);
+    state.index += 1;
+    render();
+    progress.classList.remove("moving");
+    void progress.offsetWidth;
+    progress.classList.add("moving");
+  });
+
+  function setLang(value) {
+    root.setAttribute("data-lang", value);
+    root.setAttribute("lang", value);
+    document.querySelectorAll(".lang button").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-set") === value));
+    });
+    try { localStorage.setItem("whatsnext-lang", value); } catch (e) {}
+    render();
+  }
+  document.querySelectorAll(".lang button").forEach(function (b) {
+    b.addEventListener("click", function () { setLang(b.getAttribute("data-set")); });
+  });
+  var saved = null;
+  try { saved = localStorage.getItem("whatsnext-lang"); } catch (e) {}
+  var nav = (navigator.language || "en").toLowerCase();
+  setLang(saved === "it" || saved === "en" ? saved : (nav.indexOf("it") === 0 ? "it" : "en"));
+})();
+</script>
+</body>
+</html>

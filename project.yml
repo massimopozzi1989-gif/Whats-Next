@@ -1,0 +1,74 @@
+name: DoveSonoArrivato
+options:
+  developmentLanguage: it
+  deploymentTarget:
+    macOS: '14.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: Developer ID Application
+    DEVELOPMENT_TEAM: 8ZN67F8SW8
+    ENABLE_HARDENED_RUNTIME: YES
+    # Notarization: secure timestamp, and no debugger entitlement in shipped builds.
+    OTHER_CODE_SIGN_FLAGS: --timestamp
+    CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+targets:
+  DoveSonoArrivato:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/DoveSonoArrivato
+        excludes: [Resources]
+      - path: Sources/DoveSonoArrivato/Resources
+        buildPhase: resources
+      - path: Assets/AppIcon.icns
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: it.massimopozzi.dovesonoarrivato
+        PRODUCT_NAME: "What's Next"
+        CODE_SIGN_ENTITLEMENTS: App.entitlements
+    info:
+      path: Config/App-Info.plist
+      properties:
+        CFBundleDisplayName: "What's Next?"
+        CFBundleShortVersionString: '1.0.0'
+        CFBundleVersion: '32'
+        LSUIElement: true
+        CFBundleIconFile: AppIcon
+        CFBundleLocalizations: [it, en]
+        NSHumanReadableCopyright: "© 2026 Massimo Pozzi. MIT License."
+        CFBundleURLTypes:
+          - CFBundleURLName: it.massimopozzi.dovesonoarrivato
+            CFBundleURLSchemes: [dovesonoarrivato]
+    dependencies:
+      - target: PostItWidget
+  PostItWidget:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: Widget
+      - path: Sources/DoveSonoArrivato/Shared
+      - path: Sources/DoveSonoArrivato/WorkNote.swift
+      - path: Sources/DoveSonoArrivato/Resources
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: it.massimopozzi.dovesonoarrivato.widget
+        CODE_SIGN_ENTITLEMENTS: Widget.entitlements
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+    info:
+      path: Config/Widget-Info.plist
+      properties:
+        CFBundleDisplayName: "What's Next?"
+        CFBundleShortVersionString: '1.0.0'
+        CFBundleVersion: '32'
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+schemes:
+  DoveSonoArrivato:
+    build:
+      targets:
+        DoveSonoArrivato: all

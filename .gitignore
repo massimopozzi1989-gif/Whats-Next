@@ -1,0 +1,12 @@
+.build/
+dist/
+.DS_Store
+.xcode-build/
+.xcode-build.log
+*.xcodeproj/
+*.xcuserstate
+xcuserdata/
+.swiftpm/
+Art/Blender/render.log
+*.blend1
+.claude/
