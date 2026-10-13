@@ -14,10 +14,18 @@ enum WidgetSnapshot {
         return WorkNote.ordered(notes)
     }
 
+    static func encode(_ notes: [WorkNote]) throws -> Data {
+        try JSONEncoder().encode(notes)
+    }
+
     static func write(_ notes: [WorkNote]) throws {
+        try write(data: encode(notes))
+    }
+
+    static func write(data: Data) throws {
         guard let url else { throw CocoaError(.fileNoSuchFile) }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try JSONEncoder().encode(notes).write(to: url, options: .atomic)
+        try data.write(to: url, options: .atomic)
     }
 
     static let openPanel = URL(string: "dovesonoarrivato://open")!

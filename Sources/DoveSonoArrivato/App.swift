@@ -163,7 +163,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard language != publishedLanguage else { return }
         publishedLanguage = language
         do { try AppLanguage.writeShared(language) } catch { NSLog("Widget language unavailable: %@", error.localizedDescription) }
-        store.refreshWidgets()
+        store.refreshWidgets(force: true)
         reminders.reconcile(store.notes)
     }
 

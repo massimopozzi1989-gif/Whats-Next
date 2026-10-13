@@ -16,6 +16,9 @@ final class NoteStore: ObservableObject {
     private var editTask: Task<Void, Never>?
     @Published var editRequest: WorkNote?
     private var widgetRefreshTask: Task<Void, Never>?
+    // What the widget was last given. WidgetKit grants a menu-bar app only a few dozen
+    // reloads a day, so an unchanged snapshot is never sent again.
+    private var publishedSnapshot: Data?
     // Notes changed outside the panel (the widget's "Fatto"); open cards replace their drafts.
     let externalUpdates = PassthroughSubject<WorkNote, Never>()
 
@@ -105,7 +108,8 @@ final class NoteStore: ObservableObject {
     private func scheduleWidgetRefresh() {
         widgetRefreshTask?.cancel()
         widgetRefreshTask = Task { [weak self] in
-            do { try await Task.sleep(for: .milliseconds(500)) } catch { return }
+            // Typing pauses are frequent; wait for a real stop. Hiding the panel publishes at once.
+            do { try await Task.sleep(for: .seconds(3)) } catch { return }
             self?.refreshWidgets()
         }
     }
@@ -185,16 +189,20 @@ final class NoteStore: ObservableObject {
             WidgetActions.remove(file)
         }
         // The widget showed its change optimistically; republish the app's truth either way.
-        refreshWidgets()
+        refreshWidgets(force: true)
         return applied
     }
 
-    func refreshWidgets(waitForWrite: Bool = false) {
+    // `force` republishes even an identical snapshot: after a language change, or when
+    // the widget itself rewrote the file.
+    func refreshWidgets(waitForWrite: Bool = false, force: Bool = false) {
         guard canWrite && publishesWidgets else { return }
-        let snapshot = notes
+        guard let data = try? WidgetSnapshot.encode(notes) else { return }
+        guard force || data != publishedSnapshot else { return }
+        publishedSnapshot = data
         let writeSnapshot: @Sendable () -> Void = {
             do {
-                try WidgetSnapshot.write(snapshot)
+                try WidgetSnapshot.write(data: data)
                 WidgetCenter.shared.reloadTimelines(ofKind: WidgetSnapshot.kind)
             } catch {
                 NSLog("Widget snapshot unavailable: %@", error.localizedDescription)
