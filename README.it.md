@@ -24,6 +24,7 @@ Passare da un progetto all’altro costa soprattutto nei primi dieci minuti: ril
 - **Fatto ti porta avanti.** Premi **Fatto** (o **⌘↩**): il prossimo passo diventa “Dove sono arrivato”, pronto per quello successivo. Il punto precedente resta, con la data, nel **Percorso** del foglio.
 - **Prossimo passo o In attesa.** Segna ciò che stai aspettando e imposta un promemoria: tra un’ora, domani alle 9, lunedì… All’ora giusta una notifica di macOS apre quel post-it.
 - **Un adesivo per le priorità.** Attacca un adesivo rosso di priorità a qualsiasi foglio, dal foglio aperto o con il clic destro: si vede sulla carta nel pannello e nel widget, dove i fogli con priorità vengono per primi.
+- **Uno scaffale per il lavoro finito.** Completa un foglio come **App**, **Sito web** o **Altro**: la lista Completati li raggruppa per tipo, dal più recente, con la data di completamento.
 - **I lavori fermi mostrano un orologio.** I fogli non toccati da 7 giorni (oppure 3, 14, 30 o mai, a tua scelta) indicano da quanto sono fermi.
 - **Un widget che fa qualcosa.** Widget piccolo, medio e grande con la pila nell’ordine dell’app; tocca ↰ su un foglio per segnare fatto il passo senza aprire l’app.
 - **Non ti disturba.** Vive nella barra dei menu, si apre con **⌃⌥Spazio** da qualsiasi app e non ruba il focus: l’app che stavi usando conserva la barra dei menu e torna in primo piano con Esc.

@@ -92,3 +92,21 @@ final class PriorityOrderTests: XCTestCase {
         XCTAssertEqual(WorkNote.priorityFirst([]).count, 0)
     }
 }
+
+final class CompletedSectionsTests: XCTestCase {
+    func testCompletedNotesGroupByCategoryNewestFirst() throws {
+        func done(_ title: String, _ category: String?, _ day: Double) -> WorkNote {
+            var note = WorkNote(); note.title = title; note.category = category
+            note.completedAt = Date(timeIntervalSince1970: day * 86400); return note
+        }
+        let notes = [done("Vecchia", nil, 1), done("Sito A", "website", 2), done("App A", "app", 3),
+                     done("App B", "app", 5), done("Libro", "other", 4), done("Futura", "podcast", 6)]
+        let sections = WorkNote.completedSections(notes)
+        XCTAssertEqual(sections.map { $0.category?.rawValue ?? "-" }, ["app", "website", "other", "-"])
+        XCTAssertEqual(sections[0].notes.map(\.title), ["App B", "App A"])
+        // An unknown category from a newer version lands in "no category" instead of failing.
+        XCTAssertEqual(sections[3].notes.map(\.title), ["Futura", "Vecchia"])
+        let json = #"[{"id":"6F1C2A44-2B7E-4B39-9A61-3E5E0C1E9A10","title":"X","progress":"","action":"Prossimo passo","nextStep":"","conclusion":"","color":"yellow","updatedAt":700000000,"category":"podcast"}]"#
+        XCTAssertNil(try JSONDecoder().decode([WorkNote].self, from: Data(json.utf8))[0].noteCategory)
+    }
+}

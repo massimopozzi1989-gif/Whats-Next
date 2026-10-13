@@ -89,7 +89,12 @@ struct BoardView: View {
                                     .background(PaperSurface(color: .yellow))
                             }.buttonStyle(.plain)
                         }
-                        ForEach(Array(displayedNotes.enumerated()), id: \.element.id) { index, note in
+                        ForEach(Array(rows(for: displayedNotes).enumerated()), id: \.element.id) { index, row in
+                          switch row {
+                          case .header(let category, let count):
+                            CompletedHeader(category: category, count: count, language: language)
+                                .zIndex(Double(index))
+                          case .note(let note):
                             let value = current(note)
                             EditablePostIt(note: binding(for: note), value: value,
                                            staleDays: value.staleDays(threshold: staleAfterDays, now: now),
@@ -97,12 +102,13 @@ struct BoardView: View {
                                            isExpanded: expandedID == note.id,
                                            isNew: newIDs.contains(note.id),
                                            expand: { toggleExpanded(note) },
-                                           toggleCompleted: { toggleCompleted(note) })
+                                           complete: { toggleCompleted(note, category: $0) })
                                 // Typing in one card must not rebuild every other sheet in the stack.
                                 .equatable()
                                 .background(BoardScrollMarker(id: note.id).allowsHitTesting(false).accessibilityHidden(true))
                                 .id(note.id)
                                 .zIndex(Double(index))
+                          }
                         }
                         if !displayedNotes.isEmpty {
                             Color.clear.frame(height: 36).padding(.top, 18).allowsHitTesting(false)
@@ -213,10 +219,20 @@ struct BoardView: View {
         newNotes.removeAll { $0.id == note.id }
     }
 
-    private func toggleCompleted(_ original: WorkNote) {
+    // In progress: the plain stack. Completed: one section per category, newest first.
+    private func rows(for notes: [WorkNote]) -> [BoardRow] {
+        guard completed else { return notes.map(BoardRow.note) }
+        return WorkNote.completedSections(notes).flatMap { section in
+            [BoardRow.header(section.category, section.notes.count)] + section.notes.map(BoardRow.note)
+        }
+    }
+
+    // `category` is chosen when completing; reopening passes nil and keeps the old one.
+    private func toggleCompleted(_ original: WorkNote, category: NoteCategory?) {
         var note = current(original)
         let previous = note.completedAt
         note.completedAt = previous == nil ? Date() : nil
+        if previous == nil, let category { note.category = category.rawValue }
         guard store.save(note) else { return }
         discard(original)
         expandedID = nil
@@ -236,6 +252,39 @@ struct BoardView: View {
     }
 }
 
+private enum BoardRow: Identifiable {
+    case header(NoteCategory?, Int)
+    case note(WorkNote)
+
+    var id: String {
+        switch self {
+        case .header(let category, _): return "section-\(category?.rawValue ?? "none")"
+        case .note(let note): return note.id.uuidString
+        }
+    }
+}
+
+// A label between the stacks of the Completed list, readable over any wallpaper.
+private struct CompletedHeader: View {
+    let category: NoteCategory?
+    let count: Int
+    let language: AppLanguage
+
+    var body: some View {
+        HStack {
+            Label("\(category?.sectionTitle ?? L("Senza categoria", "No category")) · \(count)",
+                  systemImage: category?.symbol ?? "questionmark.folder")
+                .font(.system(size: 12, weight: .semibold))
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(.regularMaterial, in: Capsule())
+            Spacer()
+        }
+        // The stack overlaps sheets by 18 pt; keep the label clear of both neighbours.
+        .padding(.top, 30).padding(.bottom, 26)
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
 private struct EditablePostIt: View, Equatable {
     @Binding var note: WorkNote
     // The binding's current value, compared so unchanged cards skip their body.
@@ -245,7 +294,7 @@ private struct EditablePostIt: View, Equatable {
     let isExpanded: Bool
     let isNew: Bool
     let expand: () -> Void
-    let toggleCompleted: () -> Void
+    let complete: (NoteCategory?) -> Void
     @State private var showsLink = false
     @State private var showsHistory = false
     @AppStorage(ReminderScheduler.deniedKey) private var notificationsDenied = false
@@ -329,20 +378,47 @@ private struct EditablePostIt: View, Equatable {
                         }.buttonStyle(.plain).accessibilityLabel(color.label)
                             .accessibilityAddTraits(note.color == color ? .isSelected : [])
                     }
-                    Button(action: togglePriority) {
-                        HStack(spacing: 5) {
-                            PrioritySticker(size: 14).opacity(note.isPriority ? 1 : 0.35)
-                            Text(L("Priorità", "Priority")).font(.system(size: 11, weight: .medium))
-                        }
-                    }.buttonStyle(.plain).padding(.leading, 8)
-                        .help(priorityActionTitle)
-                        .accessibilityLabel(priorityActionTitle)
-                        .accessibilityAddTraits(note.isPriority ? .isSelected : [])
+                    // Priority is for work still to do: a finished note offers its category instead.
+                    if note.completedAt == nil {
+                        Button(action: togglePriority) {
+                            HStack(spacing: 5) {
+                                PrioritySticker(size: 14).opacity(note.isPriority ? 1 : 0.35)
+                                Text(L("Priorità", "Priority")).font(.system(size: 11, weight: .medium))
+                            }.fixedSize()
+                        }.buttonStyle(.plain).padding(.leading, 8)
+                            .help(priorityActionTitle)
+                            .accessibilityLabel(priorityActionTitle)
+                            .accessibilityAddTraits(note.isPriority ? .isSelected : [])
+                    }
                     Spacer()
-                    Button(action: toggleCompleted) {
-                        Label(note.completedAt == nil ? L("Completa", "Complete") : L("Riapri", "Reopen"), systemImage: note.completedAt == nil ? "checkmark.circle" : "arrow.uturn.backward")
-                            .font(.system(size: 11, weight: .medium))
-                    }.buttonStyle(.plain).disabled(note.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    if note.completedAt == nil {
+                        // Completing asks what the work was, so the Completed list can group it.
+                        Menu {
+                            ForEach(NoteCategory.allCases) { category in
+                                Button { complete(category) } label: { Label(category.label, systemImage: category.symbol) }
+                            }
+                        } label: {
+                            Label(L("Completa", "Complete"), systemImage: "checkmark.circle").font(.system(size: 11, weight: .medium))
+                        }.menuStyle(.borderlessButton).fixedSize()
+                            .disabled(note.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .help(L("Completa e scegli se è un’app, un sito web o altro", "Complete and file it as an app, a website or other"))
+                    } else {
+                        Menu {
+                            ForEach(NoteCategory.allCases) { category in
+                                Button { edit(L("Categoria", "Category")) { $0.category = category.rawValue } } label: {
+                                    Label(category.label, systemImage: category.symbol)
+                                }
+                            }
+                        } label: {
+                            Label(note.noteCategory?.label ?? L("Categoria", "Category"),
+                                  systemImage: note.noteCategory?.symbol ?? "folder").font(.system(size: 11, weight: .medium))
+                        }.menuStyle(.borderlessButton).fixedSize()
+                            .accessibilityLabel(L("Categoria", "Category"))
+                        Button { complete(nil) } label: {
+                            Label(L("Riapri", "Reopen"), systemImage: "arrow.uturn.backward").font(.system(size: 11, weight: .medium))
+                                .fixedSize()
+                        }.buttonStyle(.plain).padding(.leading, 8)
+                    }
                 }.padding(.top, 6)
             } else {
                 HStack(alignment: .center, spacing: 8) {
@@ -351,6 +427,11 @@ private struct EditablePostIt: View, Equatable {
                         Spacer(minLength: 0)
                         if note.action == .waiting, note.completedAt == nil, let date = note.reminderAt, date > Date() {
                             Image(systemName: "bell.fill").font(.system(size: 9)).opacity(0.5)
+                        }
+                        if let completedAt = note.completedAt {
+                            Text(completedAt.localized(.dateTime.day().month(.abbreviated)))
+                                .font(.system(size: 10, weight: .semibold).monospacedDigit()).opacity(0.5)
+                                .fixedSize()
                         }
                         if let staleDays {
                             Label("\(staleDays) \(L("g", "d"))", systemImage: "clock")
@@ -362,7 +443,8 @@ private struct EditablePostIt: View, Equatable {
                         .padding(.horizontal, 24).padding(.bottom, 18)
                         .accessibilityHidden(true)
                         .overlay(PaperOpenArea(id: note.id, title: collapsedLabel, color: note.color, open: expand,
-                                               contextTitle: priorityActionTitle, contextAction: togglePriority))
+                                               contextTitle: note.completedAt == nil ? priorityActionTitle : nil,
+                                               contextAction: note.completedAt == nil ? togglePriority : nil))
             }
         }
         .padding(.horizontal, isExpanded ? 24 : 0)
@@ -374,7 +456,7 @@ private struct EditablePostIt: View, Equatable {
         .background(PaperSurface(color: note.color).shadow(color: .black.opacity(0.16), radius: 3, x: 0, y: -2))
         // Stuck on the top-left corner, half over the edge, clear of the title.
         .overlay(alignment: .topLeading) {
-            if note.isPriority { PrioritySticker().offset(x: -6, y: -6).allowsHitTesting(false) }
+            if note.isPriority && note.completedAt == nil { PrioritySticker().offset(x: -6, y: -6).allowsHitTesting(false) }
         }
         .onChange(of: linkError) { _, message in
             if message != nil { NSApp.activate(ignoringOtherApps: true) }

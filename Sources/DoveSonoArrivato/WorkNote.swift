@@ -23,6 +23,33 @@ enum PaperColor: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+// What a finished note was: chosen when completing it, used to group the Completed list.
+enum NoteCategory: String, CaseIterable, Identifiable {
+    case app, website, other
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .app: return L("App", "App")
+        case .website: return L("Sito web", "Website")
+        case .other: return L("Altro", "Other")
+        }
+    }
+    var sectionTitle: String {
+        switch self {
+        case .app: return L("App", "Apps")
+        case .website: return L("Siti web", "Websites")
+        case .other: return L("Altro", "Other")
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .app: return "square.grid.2x2"
+        case .website: return "globe"
+        case .other: return "tray"
+        }
+    }
+}
+
 // A point the work has moved past, archived when "Fatto" advances the note.
 struct StepEntry: Codable, Equatable, Identifiable {
     var id = UUID()
@@ -50,6 +77,21 @@ struct WorkNote: Identifiable, Codable, Equatable {
     var priority: Bool?
 
     var isPriority: Bool { priority == true }
+    // Stored as text so an unknown value from a newer version never breaks decoding.
+    var category: String?
+
+    var noteCategory: NoteCategory? { category.flatMap(NoteCategory.init(rawValue:)) }
+
+    // The Completed list: Apps, Websites, Other, then notes completed before categories
+    // existed. Newest first inside each section.
+    static func completedSections(_ notes: [WorkNote]) -> [(category: NoteCategory?, notes: [WorkNote])] {
+        let order: [NoteCategory?] = NoteCategory.allCases.map { Optional($0) } + [nil]
+        return order.compactMap { category in
+            let members = notes.filter { $0.noteCategory == category }
+                .sorted { ($0.completedAt ?? .distantPast) > ($1.completedAt ?? .distantPast) }
+            return members.isEmpty ? nil : (category, members)
+        }
+    }
 
     var steps: [StepEntry] { history ?? [] }
 
