@@ -34,7 +34,7 @@ targets:
       properties:
         CFBundleDisplayName: "What's Next?"
         CFBundleShortVersionString: '1.1.0'
-        CFBundleVersion: '33'
+        CFBundleVersion: '34'
         LSUIElement: true
         CFBundleIconFile: AppIcon
         CFBundleLocalizations: [it, en]
@@ -64,7 +64,7 @@ targets:
       properties:
         CFBundleDisplayName: "What's Next?"
         CFBundleShortVersionString: '1.1.0'
-        CFBundleVersion: '33'
+        CFBundleVersion: '34'
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
 schemes:

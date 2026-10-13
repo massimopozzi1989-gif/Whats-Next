@@ -107,7 +107,7 @@ struct PostItProvider: AppIntentTimelineProvider {
     }
     private func entry(_ configuration: PostItConfiguration) -> PostItEntry {
         adoptAppLanguage()
-        let notes = WidgetSnapshot.read().filter {
+        let notes = WorkNote.priorityFirst(WidgetSnapshot.read()).filter {
             if let selected = configuration.note { return $0.id.uuidString == selected.id }
             return ($0.completedAt != nil) == configuration.completed
         }

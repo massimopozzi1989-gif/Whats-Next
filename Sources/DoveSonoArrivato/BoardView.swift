@@ -22,7 +22,8 @@ struct BoardView: View {
 
     private var visibleNotes: [WorkNote] {
         let saved = store.orderedNotes
-        return (newNotes + saved).filter { ($0.completedAt != nil) == completed }
+        return WorkNote.priorityFirst((newNotes + saved).map { drafts[$0.id] ?? $0 })
+            .filter { ($0.completedAt != nil) == completed }
             .filter { note in
                 drafts[note.id] != nil || search.isEmpty ||
                 "\(note.title) \(note.progress) \(note.nextStep) \(note.conclusion) \(note.steps.map(\.text).joined(separator: " "))"

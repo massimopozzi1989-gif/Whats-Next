@@ -84,6 +84,11 @@ struct WorkNote: Identifiable, Codable, Equatable {
         return days >= threshold ? days : nil
     }
 
+    // Notes with the priority sticker come first; each group keeps its manual order.
+    static func priorityFirst(_ notes: [WorkNote]) -> [WorkNote] {
+        notes.filter(\.isPriority) + notes.filter { !$0.isPriority }
+    }
+
     static func ordered(_ notes: [WorkNote]) -> [WorkNote] {
         notes.sorted {
             let left = $0.sortPosition ?? Int.max

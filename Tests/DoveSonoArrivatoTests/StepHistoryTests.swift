@@ -81,3 +81,14 @@ final class PriorityStickerTests: XCTestCase {
         XCTAssertFalse(String(decoding: try JSONEncoder().encode(note), as: UTF8.self).contains("priority"))
     }
 }
+
+final class PriorityOrderTests: XCTestCase {
+    func testPriorityNotesComeFirstAndEachGroupKeepsItsOrder() {
+        func note(_ title: String, _ priority: Bool) -> WorkNote {
+            var note = WorkNote(); note.title = title; note.priority = priority ? true : nil; return note
+        }
+        let notes = [note("A", false), note("B", true), note("C", false), note("D", true), note("E", false)]
+        XCTAssertEqual(WorkNote.priorityFirst(notes).map(\.title), ["B", "D", "A", "C", "E"])
+        XCTAssertEqual(WorkNote.priorityFirst([]).count, 0)
+    }
+}
