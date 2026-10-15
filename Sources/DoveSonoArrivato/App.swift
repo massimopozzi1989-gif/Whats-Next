@@ -129,7 +129,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.image = NSImage(systemSymbolName: "note.text", accessibilityDescription: "What’s Next?")
         statusItem.button?.imagePosition = .imageLeading
         statusItem.button?.target = self
-        statusItem.button?.action = #selector(togglePanel)
+        statusItem.button?.action = #selector(handleStatusItemClick(_:))
+        statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
 
         panel = NotesPanel(contentRect: NSRect(x: 0, y: 0, width: 360, height: 680),
                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -259,6 +260,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let requested {
             DispatchQueue.main.async { [weak self] in self?.store.editRequest = requested }
         }
+    }
+
+    @objc private func handleStatusItemClick(_ sender: NSStatusBarButton) {
+        let event = NSApp.currentEvent
+        let isRightClick = event?.type == .rightMouseUp
+            || (event?.type == .leftMouseUp && event?.modifierFlags.contains(.control) == true)
+        if isRightClick {
+            showStatusItemMenu()
+        } else {
+            togglePanel()
+        }
+    }
+
+    static func buildStatusItemMenu(isPanelVisible: Bool, target: AnyObject?) -> NSMenu {
+        let menu = NSMenu()
+        let toggleTitle = isPanelVisible
+            ? L("Nascondi What’s Next?", "Hide What’s Next?")
+            : L("Mostra What’s Next?", "Show What’s Next?")
+        let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(togglePanel), keyEquivalent: "")
+        toggleItem.target = target
+        menu.addItem(toggleItem)
+
+        let newItem = NSMenuItem(title: L("Nuovo post-it", "New note"), action: #selector(newNoteFromMenu), keyEquivalent: "n")
+        newItem.target = target
+        menu.addItem(newItem)
+
+        menu.addItem(.separator())
+
+        let quitItem = NSMenuItem(title: L("Esci da What’s Next?", "Quit What’s Next?"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(quitItem)
+        return menu
+    }
+
+    private func showStatusItemMenu() {
+        guard let button = statusItem.button else { return }
+        let menu = Self.buildStatusItemMenu(isPanelVisible: panel?.isVisible == true, target: self)
+        statusItem.menu = menu
+        button.performClick(nil)
+        statusItem.menu = nil
+    }
+
+    @objc private func newNoteFromMenu() {
+        openPanel(for: URL(string: "dovesonoarrivato://new")!)
     }
 
     @objc private func togglePanel() {

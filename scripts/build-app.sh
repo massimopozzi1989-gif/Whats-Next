@@ -4,6 +4,7 @@ cd "${0:A:h:h}"
 APP_NAME="What's Next"
 LS_REGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 xcodegen generate
+rm -rf .xcode-build/Build/Products/Release
 xcodebuild -project DoveSonoArrivato.xcodeproj -scheme DoveSonoArrivato \
   -configuration Release -derivedDataPath .xcode-build build > .xcode-build.log 2>&1 || {
   tail -60 .xcode-build.log

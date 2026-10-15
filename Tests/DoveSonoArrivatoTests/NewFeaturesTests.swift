@@ -118,4 +118,15 @@ final class NewFeaturesTests: XCTestCase {
 
         wait(for: [searchExp, copyExp, navExp], timeout: 1)
     }
+
+    @MainActor
+    func testStatusItemRightClickMenuContainsShowNewAndQuit() {
+        AppLanguage.forced = .italian
+        let menu = AppDelegate.buildStatusItemMenu(isPanelVisible: false, target: nil)
+        let titles = menu.items.filter { !$0.isSeparatorItem }.map(\.title)
+        XCTAssertEqual(titles, ["Mostra What’s Next?", "Nuovo post-it", "Esci da What’s Next?"])
+        XCTAssertEqual(menu.items.last?.action, #selector(NSApplication.terminate(_:)))
+        let visibleMenu = AppDelegate.buildStatusItemMenu(isPanelVisible: true, target: nil)
+        XCTAssertEqual(visibleMenu.items.first?.title, "Nascondi What’s Next?")
+    }
 }
