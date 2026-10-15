@@ -33,8 +33,8 @@ targets:
       path: Config/App-Info.plist
       properties:
         CFBundleDisplayName: "What's Next?"
-        CFBundleShortVersionString: '1.3.0'
-        CFBundleVersion: '38'
+        CFBundleShortVersionString: '1.4.0'
+        CFBundleVersion: '39'
         LSUIElement: true
         CFBundleIconFile: AppIcon
         CFBundleLocalizations: [it, en]
@@ -63,8 +63,8 @@ targets:
       path: Config/Widget-Info.plist
       properties:
         CFBundleDisplayName: "What's Next?"
-        CFBundleShortVersionString: '1.3.0'
-        CFBundleVersion: '38'
+        CFBundleShortVersionString: '1.4.0'
+        CFBundleVersion: '39'
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
 schemes:

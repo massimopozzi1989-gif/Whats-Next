@@ -32,6 +32,37 @@ final class PaperTextView: NSTextView {
         super.mouseDown(with: event)
     }
 
+    // Tab and Backtab move between the editors on the open card rather than inserting a tab character.
+    override func keyDown(with event: NSEvent) {
+        let flags = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        if event.keyCode == 48 { // Tab
+            if flags.isEmpty {
+                if moveToSiblingEditor(forward: true) { return }
+            } else if flags == .shift {
+                if moveToSiblingEditor(forward: false) { return }
+            }
+        }
+        super.keyDown(with: event)
+    }
+
+    private func moveToSiblingEditor(forward: Bool) -> Bool {
+        guard let window, let root = window.contentView else { return false }
+        var editors: [PaperTextView] = []
+        func collect(_ view: NSView) {
+            if let editor = view as? PaperTextView, !editor.isHiddenOrHasHiddenAncestor {
+                editors.append(editor)
+            }
+            for sub in view.subviews { collect(sub) }
+        }
+        collect(root)
+        guard editors.count > 1, let index = editors.firstIndex(where: { $0 === self }) else { return false }
+        let targetIndex = forward ? (index + 1) % editors.count : (index - 1 + editors.count) % editors.count
+        let target = editors[targetIndex]
+        window.makeFirstResponder(target)
+        target.setSelectedRange(NSRange(location: (target.string as NSString).length, length: 0))
+        return true
+    }
+
     override func scrollWheel(with event: NSEvent) {
         // The editor grows with its text; the enclosing board owns all scrolling.
         var ancestor = superview
@@ -127,10 +158,9 @@ struct PaperTextEditor: NSViewRepresentable {
             return coordinator.measuredSize
         }
         let sample = text.isEmpty ? placeholder : (text.hasSuffix("\n") ? text + " " : text)
-        let bounds = (sample as NSString).boundingRect(with: CGSize(width: width, height: .greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: font])
+        let measuredHeight = Self.measureHeight(sample, width: width, font: font)
         let lineHeight = Self.lineHeight(for: font)
-        let size = CGSize(width: width, height: max(44, ceil(lineHeight) + 12, ceil(bounds.height) + 12))
+        let size = CGSize(width: width, height: max(44, ceil(lineHeight) + 12, ceil(measuredHeight) + 12))
         coordinator.measuredText = text
         coordinator.measuredPlaceholder = placeholder
         coordinator.measuredWidth = width
@@ -142,7 +172,18 @@ struct PaperTextEditor: NSViewRepresentable {
     static let ink = NSColor(red: 0.19, green: 0.22, blue: 0.19, alpha: 1)
     private static var fonts: [String: NSFont] = [:]
     private static var lineHeights: [NSFont: CGFloat] = [:]
-    private static let measuringLayout = NSLayoutManager()
+    private static let measuringStorage = NSTextStorage()
+    private static let measuringLayout: NSLayoutManager = {
+        let lm = NSLayoutManager()
+        measuringStorage.addLayoutManager(lm)
+        return lm
+    }()
+    private static let measuringContainer: NSTextContainer = {
+        let tc = NSTextContainer(size: NSSize(width: 280, height: CGFloat.greatestFiniteMagnitude))
+        tc.lineFragmentPadding = 0
+        measuringLayout.addTextContainer(tc)
+        return tc
+    }()
 
     static func font(size: CGFloat, bold: Bool) -> NSFont {
         let key = "\(bold ? "b" : "l")\(size)"
@@ -158,6 +199,16 @@ struct PaperTextEditor: NSViewRepresentable {
         let height = measuringLayout.defaultLineHeight(for: font)
         lineHeights[font] = height
         return height
+    }
+
+    // Measure using TextKit 1's own layout manager so multiline wrapping matches NSTextView.
+    private static func measureHeight(_ text: String, width: CGFloat, font: NSFont) -> CGFloat {
+        measuringContainer.containerSize = NSSize(width: width, height: .greatestFiniteMagnitude)
+        measuringStorage.beginEditing()
+        measuringStorage.setAttributedString(NSAttributedString(string: text, attributes: [.font: font]))
+        measuringStorage.endEditing()
+        measuringLayout.ensureLayout(for: measuringContainer)
+        return measuringLayout.usedRect(for: measuringContainer).height
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {

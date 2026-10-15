@@ -147,9 +147,13 @@ final class BoardNativeScrollView<Content: View>: NSScrollView {
         var rows: [NoteDragRow] = []
         func collect(_ view: NSView) {
             if let name = view.identifier?.rawValue,
-               name.hasPrefix("postit-scroll-"),
-               let id = UUID(uuidString: String(name.dropFirst("postit-scroll-".count))) {
-                rows.append(NoteDragRow(id: id, frame: view.convert(view.bounds, to: document)))
+               name.hasPrefix("postit-scroll-") {
+                let rest = String(name.dropFirst("postit-scroll-".count))
+                let isPriority = rest.hasSuffix("-priority")
+                let uuidPart = isPriority ? String(rest.dropLast("-priority".count)) : rest
+                if let id = UUID(uuidString: uuidPart) {
+                    rows.append(NoteDragRow(id: id, frame: view.convert(view.bounds, to: document), isPriority: isPriority))
+                }
             }
             for child in view.subviews { collect(child) }
         }
@@ -181,7 +185,7 @@ final class BoardNativeScrollView<Content: View>: NSScrollView {
     }
     private func updateInsertion() {
         guard let point = dragPoint else { return }
-        placement = NoteDragPlacement.resolve(y: document.convert(point, from: nil).y, rows: dragRows())
+        placement = NoteDragPlacement.resolve(y: document.convert(point, from: nil).y, rows: dragRows(), sourceID: dragSource)
         guard let placement else { insertionLine.isHidden = true; return }
         let seam = convert(NSPoint(x: 0, y: placement.indicatorY), from: document)
         let viewport = contentView.frame
@@ -226,7 +230,10 @@ final class BoardNativeScrollView<Content: View>: NSScrollView {
     }
 
     private func findMarker(_ id: UUID, in view: NSView) -> NSView? {
-        if view.identifier?.rawValue == "postit-scroll-\(id.uuidString)" { return view }
+        if let raw = view.identifier?.rawValue,
+           raw == "postit-scroll-\(id.uuidString)" || raw == "postit-scroll-\(id.uuidString)-priority" {
+            return view
+        }
         for child in view.subviews {
             if let match = findMarker(id, in: child) { return match }
         }
@@ -236,12 +243,14 @@ final class BoardNativeScrollView<Content: View>: NSScrollView {
 
 struct BoardScrollMarker: NSViewRepresentable {
     let id: UUID
+    var isPriority: Bool = false
     private final class Marker: NSView {
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
     }
     func makeNSView(context: Context) -> NSView { Marker(frame: .zero) }
     func updateNSView(_ view: NSView, context: Context) {
-        view.identifier = NSUserInterfaceItemIdentifier("postit-scroll-\(id.uuidString)")
+        let suffix = isPriority ? "-priority" : ""
+        view.identifier = NSUserInterfaceItemIdentifier("postit-scroll-\(id.uuidString)\(suffix)")
     }
 }
 

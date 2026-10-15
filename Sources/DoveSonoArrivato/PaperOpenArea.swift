@@ -9,10 +9,17 @@ struct PaperOpenArea: NSViewRepresentable {
     var opensOnClick = true
     // Right-click on the paper: quick actions such as the priority sticker or deleting.
     var contextItems: [ContextItem] = []
+    // Drop a folder from Finder or a URL from the browser onto the paper.
+    var onDropLink: ((String) -> Void)?
 
     struct ContextItem {
         let title: String
         let action: () -> Void
+        var isSeparator = false
+
+        static func separator() -> ContextItem {
+            ContextItem(title: "", action: {}, isSeparator: true)
+        }
     }
 
     func makeNSView(context: Context) -> OpenView { OpenView(frame: .zero) }
@@ -23,6 +30,7 @@ struct PaperOpenArea: NSViewRepresentable {
         view.open = open
         view.opensOnClick = opensOnClick
         view.contextItems = contextItems
+        view.onDropLink = onDropLink
         view.setAccessibilityElement(true)
         view.setAccessibilityRole(opensOnClick ? .button : .image)
         view.setAccessibilityLabel(title)
@@ -38,12 +46,14 @@ struct PaperOpenArea: NSViewRepresentable {
         var open: (() -> Void)?
         var opensOnClick = true
         var contextItems: [ContextItem] = []
+        var onDropLink: ((String) -> Void)?
         private var start = NSPoint.zero
         private var isDragging = false
         private var didDrag = false
 
         override init(frame: NSRect) {
             super.init(frame: frame)
+            registerForDraggedTypes([.fileURL, .URL, .string])
         }
         required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -85,10 +95,14 @@ struct PaperOpenArea: NSViewRepresentable {
             guard !contextItems.isEmpty else { return nil }
             let menu = NSMenu()
             for (index, entry) in contextItems.enumerated() {
-                let item = NSMenuItem(title: entry.title, action: #selector(runContextItem(_:)), keyEquivalent: "")
-                item.target = self
-                item.tag = index
-                menu.addItem(item)
+                if entry.isSeparator {
+                    menu.addItem(.separator())
+                } else {
+                    let item = NSMenuItem(title: entry.title, action: #selector(runContextItem(_:)), keyEquivalent: "")
+                    item.target = self
+                    item.tag = index
+                    menu.addItem(item)
+                }
             }
             return menu
         }
@@ -98,6 +112,24 @@ struct PaperOpenArea: NSViewRepresentable {
         }
         func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { .move }
         func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) { isDragging = false }
+
+        override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+            guard onDropLink != nil,
+                  sender.draggingPasteboard.string(forType: Self.pasteboardType) == nil,
+                  WorkLink.droppedLink(from: sender.draggingPasteboard) != nil else { return [] }
+            return .link
+        }
+        override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+            draggingEntered(sender)
+        }
+        override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+            guard let onDropLink,
+                  sender.draggingPasteboard.string(forType: Self.pasteboardType) == nil,
+                  let link = WorkLink.droppedLink(from: sender.draggingPasteboard) else { return false }
+            onDropLink(link)
+            return true
+        }
+
         override func accessibilityPerformPress() -> Bool {
             guard opensOnClick else { return false }
             open?()

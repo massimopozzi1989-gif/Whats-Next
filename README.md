@@ -23,14 +23,16 @@ Switching between projects costs the most in the first ten minutes back: rereadi
 ## Features
 
 - **One note per project, stacked like paper.** Each sheet shows only its title strip; click anywhere on it to open. Drag a closed sheet to reorder the stack.
-- **Done moves you forward.** Click **Done** (or press **⌘↩**) and your next step becomes “Where I left off”, ready for the next one. The previous point is kept, dated, in the note’s **Path**.
-- **Next step or waiting for.** Mark what you are waiting on and set a reminder — in an hour, tomorrow at 9, Monday… A macOS notification opens that note when it’s time.
+- **Done moves you forward.** Click **Done** (or press **⌘↩**, or right‑click a closed note) and your next step becomes “Where I left off”, ready for the next one. The previous point is kept, dated, in the note’s **Path**.
+- **Next step or waiting for.** Mark what you are waiting on and set a reminder — in an hour, tomorrow at 9, Monday, or any custom date and time. A macOS notification opens that note when it’s time, and a subtle dot on the menu‑bar icon reminds you of overdue waits.
 - **A sticker for what matters.** Put a red priority sticker on any note — from the open note or with a right‑click — and it shows on the paper in the panel and in the widget, where priority notes come first.
 - **A shelf for finished work.** Complete a note as an **App**, a **Website** or **Other**; the Completed list groups them by kind, newest first, with the date you finished.
 - **Stale notes get a clock.** Notes you haven’t touched for 7 days (3, 14, 30 or never — your choice) show how long they’ve been sitting.
 - **A widget that does something.** Small, medium and large widgets show your stack in order; tap ↰ on a note to mark its step done without opening the app.
-- **Out of your way.** Lives in the menu bar, opens with **⌃⌥Space** from any app, and never steals focus: the app you were using keeps its menu bar and gets the keyboard back when you press Esc.
-- **Links to your work.** Attach a folder or a URL to each note and open it from there.
+- **Out of your way.** Lives in the menu bar, opens at login, toggles with **⌃⌥Space** (or your own custom global shortcut) from any app, and never steals focus: the app you were using keeps its menu bar and gets the keyboard back when you press Esc.
+- **Links to your work.** Attach a folder or a URL to each note — or drop one right onto a sheet from Finder or your browser — and open it from the open note or via right‑click.
+- **Copy as text.** Copy any note as clean plain text with **⌘⇧C**, the copy button, or right‑click.
+- **Spotlight & Shortcuts.** Notes are indexed locally in Spotlight and exposed to macOS Shortcuts and Siri via App Intents.
 - **Undo everything.** ⌘Z / ⌘⇧Z cover typing and every card action: Done, color, reminders, complete, reopen and delete (trash icon on the open note, or right‑click a closed one).
 - **English and Italian**, switchable live in Settings (the widget follows).
 - **Private by design.** No account, no network, no analytics. Notes are a plain JSON file on your Mac.
@@ -51,11 +53,15 @@ Open Notification Center (click the date in the menu bar), choose **Edit Widgets
 
 | Shortcut | Action |
 | --- | --- |
-| ⌃⌥Space | Show or hide the panel from any app |
+| ⌃⌥Space (customizable) | Show or hide the panel from any app |
 | ⌘N | New note |
+| ⌘F | Search notes |
+| ↑ / ↓ / ↩ | Navigate notes and open or close the selected sheet |
+| Tab / ⇧Tab | Move between fields in the open note |
 | ⌘↩ | Done: move the next step to “Where I left off” |
+| ⌘⇧C | Copy note as plain text |
 | ⌘Z / ⌘⇧Z | Undo / redo |
-| Esc | Hide the panel |
+| Esc | Close search or hide the panel |
 
 ## Your data
 
@@ -83,7 +89,7 @@ The bundle build signs with a Developer ID for team `8ZN67F8SW8`. To build under
 - **Paper modeled in Blender.** `Art/Blender/make_paper.py` renders the five paper textures used by both app and widget.
 
 ```
-Sources/DoveSonoArrivato/   app: panel, board, editors, store, reminders
+Sources/DoveSonoArrivato/   app: panel, board, editors, store, reminders, spotlight, shortcuts
 Sources/DoveSonoArrivato/Shared/   shared with the widget: paper, snapshot, actions, localization
 Widget/                     WidgetKit extension and App Intents
 Tests/                      XCTest suite
@@ -94,11 +100,6 @@ docs/                       website (GitHub Pages)
 
 ## Roadmap
 
-- Launch at login
-- Copy a note as text
-- Custom global shortcut
-- Shortcuts and Siri actions
-- Spotlight search
 - iCloud sync and an iPhone app
 
 Ideas and bug reports are welcome in [Issues](https://github.com/massimopozzi1989-gif/Whats-Next/issues).

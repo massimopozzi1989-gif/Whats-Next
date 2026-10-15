@@ -4,6 +4,7 @@ import WidgetKit
 
 @MainActor
 final class NoteStore: ObservableObject {
+    static weak var shared: NoteStore?
     @Published private(set) var notes: [WorkNote] = []
     @Published var errorMessage: String?
     private let fileURL: URL
@@ -27,12 +28,14 @@ final class NoteStore: ObservableObject {
         self.fileURL = fileURL ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("DoveSonoArrivato", isDirectory: true)
             .appendingPathComponent("notes.json")
+        if fileURL == nil { Self.shared = self }
         do {
             if FileManager.default.fileExists(atPath: self.fileURL.path) {
                 notes = WorkNote.ordered(try JSONDecoder().decode([WorkNote].self, from: Data(contentsOf: self.fileURL)))
                 for index in notes.indices { notes[index].sortPosition = index }
             }
             orderedCache = WorkNote.ordered(notes)
+            if publishesWidgets { SpotlightIndexer.reindex(orderedCache) }
         } catch {
             canWrite = false
             errorMessage = L("Non riesco a leggere le note salvate. Il file originale è stato conservato in \(self.fileURL.path).",
@@ -103,6 +106,7 @@ final class NoteStore: ObservableObject {
         guard notes != candidate else { return }
         orderedCache = WorkNote.ordered(candidate)
         notes = candidate
+        if publishesWidgets { SpotlightIndexer.reindex(orderedCache) }
     }
 
     private func scheduleWidgetRefresh() {
@@ -166,10 +170,11 @@ final class NoteStore: ObservableObject {
     func reorder(_ ids: [UUID]) -> Bool {
         guard pendingEdits.isEmpty || flushPendingEdits() else { return false }
         let selected = Set(ids)
+        let byID = Dictionary(uniqueKeysWithValues: notes.map { ($0.id, $0) })
         guard selected.count == ids.count, ids.count > 1,
-              selected.isSubset(of: Set(notes.map(\.id))) else { return false }
+              selected.isSubset(of: byID.keys) else { return false }
         var candidate = orderedNotes
-        let replacements = ids.compactMap { id in notes.first { $0.id == id } }
+        let replacements = ids.compactMap { byID[$0] }
         var next = 0
         for index in candidate.indices where selected.contains(candidate[index].id) {
             candidate[index] = replacements[next]

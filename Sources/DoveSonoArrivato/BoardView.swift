@@ -13,7 +13,9 @@ struct BoardView: View {
     @State private var newNotes: [WorkNote] = []
     @State private var search = ""
     @State private var showsSearch = false
+    @FocusState private var searchFocused: Bool
     @State private var expandedID: UUID?
+    @State private var highlightedID: UUID?
     @State private var pendingDeletion: WorkNote?
     @AppStorage("defaultPaperColor") private var defaultPaperColor = PaperColor.yellow.rawValue
     @Environment(\.openSettings) private var openSettings
@@ -23,12 +25,13 @@ struct BoardView: View {
 
     private var visibleNotes: [WorkNote] {
         let saved = store.orderedNotes
+        let trimmedQuery = search.trimmingCharacters(in: .whitespacesAndNewlines)
         return WorkNote.priorityFirst((newNotes + saved).map { drafts[$0.id] ?? $0 })
             .filter { ($0.completedAt != nil) == completed }
             .filter { note in
-                drafts[note.id] != nil || search.isEmpty ||
-                "\(note.title) \(note.progress) \(note.nextStep) \(note.conclusion) \(note.steps.map(\.text).joined(separator: " "))"
-                    .localizedCaseInsensitiveContains(search)
+                guard !trimmedQuery.isEmpty, drafts[note.id] == nil else { return true }
+                return "\(note.title) \(note.progress) \(note.nextStep) \(note.steps.map(\.text).joined(separator: " "))"
+                    .localizedCaseInsensitiveContains(trimmedQuery)
             }
     }
 
@@ -37,13 +40,17 @@ struct BoardView: View {
         let newIDs = Set(newNotes.map(\.id))
         let now = Date()
         let language = AppLanguage.current
+        let completedCount = store.notes.reduce(0) { $0 + ($1.completedAt != nil ? 1 : 0) }
+        let activeCount = (store.notes.count - completedCount) + newNotes.count
         return VStack(spacing: 10) {
             HStack(spacing: 8) {
                 Menu {
-                    Button(L("In corso", "In progress") + " · \(store.notes.filter { $0.completedAt == nil }.count + newNotes.count)") { showList(completed: false) }
-                    Button(L("Completati", "Completed") + " · \(store.notes.filter { $0.completedAt != nil }.count)") { showList(completed: true) }
+                    Button(L("In corso", "In progress") + " · \(activeCount)") { showList(completed: false) }
+                    Button(L("Completati", "Completed") + " · \(completedCount)") { showList(completed: true) }
                     Divider()
-                    Button(showsSearch ? L("Nascondi ricerca", "Hide search") : L("Cerca un lavoro", "Search notes")) { showsSearch.toggle(); if !showsSearch { search = "" } }
+                    Button(showsSearch ? L("Nascondi ricerca (⌘F)", "Hide search (⌘F)") : L("Cerca un lavoro (⌘F)", "Search notes (⌘F)")) {
+                        toggleSearch()
+                    }
                     Button(L("Impostazioni…", "Settings…")) {
                         // The panel never activates the app; a real window needs it to come forward.
                         NSApp.activate(ignoringOtherApps: true)
@@ -64,18 +71,25 @@ struct BoardView: View {
                 Spacer()
                 floatingButton(L("Nuovo post-it", "New note"), symbol: "plus", action: addNote)
                     .keyboardShortcut("n", modifiers: .command)
-                floatingButton(L("Nascondi il pannello", "Hide panel"), symbol: "xmark", action: hide)
+                floatingButton(L("Nascondi il pannello", "Hide panel"), symbol: "xmark", action: handleEscapeOrHide)
                     .keyboardShortcut(.escape, modifiers: [])
             }.padding(.horizontal, 14).padding(.top, 10)
 
             if showsSearch {
                 HStack {
                     Image(systemName: "magnifyingglass")
-                    TextField(L("Cerca un lavoro", "Search notes"), text: $search).textFieldStyle(.plain)
+                    TextField(L("Cerca un lavoro", "Search notes"), text: $search)
+                        .textFieldStyle(.plain)
+                        .focused($searchFocused)
+                        .onExitCommand { closeSearch() }
+                    if !search.isEmpty {
+                        Button { search = "" } label: { Image(systemName: "xmark.circle.fill").opacity(0.6) }
+                            .buttonStyle(.plain)
+                    }
                 }.padding(10).background(.regularMaterial, in: Capsule()).padding(.horizontal, 14)
             }
 
-            NativeBoardScrollView(selectedID: expandedID, contentHeightChanged: { notesHeight = $0 },
+            NativeBoardScrollView(selectedID: expandedID ?? highlightedID, contentHeightChanged: { notesHeight = $0 },
                                   moveNote: { source, target, after in move(source, relativeTo: target, after: after) }) {
                     VStack(spacing: -18) {
                         if displayedNotes.isEmpty {
@@ -101,13 +115,18 @@ struct BoardView: View {
                                            staleDays: value.staleDays(threshold: staleAfterDays, now: now),
                                            language: language,
                                            isExpanded: expandedID == note.id,
+                                           isHighlighted: highlightedID == note.id && expandedID != note.id,
                                            isNew: newIDs.contains(note.id),
-                                           expand: { toggleExpanded(note) },
+                                           expand: {
+                                               highlightedID = note.id
+                                               toggleExpanded(note)
+                                           },
                                            complete: { toggleCompleted(note, category: $0) },
-                                           delete: { requestDeletion(note) })
+                                           delete: { requestDeletion(note) },
+                                           copyNote: { copyToPasteboard(current(note)) })
                                 // Typing in one card must not rebuild every other sheet in the stack.
                                 .equatable()
-                                .background(BoardScrollMarker(id: note.id).allowsHitTesting(false).accessibilityHidden(true))
+                                .background(BoardScrollMarker(id: note.id, isPriority: value.isPriority && value.completedAt == nil).allowsHitTesting(false).accessibilityHidden(true))
                                 .id(note.id)
                                 .zIndex(Double(index))
                           }
@@ -131,6 +150,22 @@ struct BoardView: View {
                 resize(min(maxHeight, height))
             }
         })
+        .onReceive(NotificationCenter.default.publisher(for: .postItToggleSearch)) { _ in
+            toggleSearch()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .postItCopyNote)) { _ in
+            if let id = expandedID ?? highlightedID, let target = displayedNotes.first(where: { $0.id == id }) {
+                copyToPasteboard(current(target))
+            } else if let first = displayedNotes.first {
+                copyToPasteboard(current(first))
+            } else {
+                NSSound.beep()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .postItNavigateKey)) { notification in
+            guard let keyCode = notification.userInfo?["keyCode"] as? UInt16 else { return }
+            handleNavigationKey(keyCode, notes: displayedNotes)
+        }
         .onReceive(store.$editRequest) { requested in
             guard let requested else { return }
             beginReading()
@@ -142,6 +177,7 @@ struct BoardView: View {
                 drafts[requested.id] = requested
             }
             expandedID = requested.id
+            highlightedID = requested.id
             store.editRequest = nil
         }
         .onReceive(store.externalUpdates) { note in
@@ -169,6 +205,60 @@ struct BoardView: View {
         .alert(L("Le note richiedono attenzione", "Your notes need attention"), isPresented: Binding(get: { store.errorMessage != nil }, set: { if !$0 { store.errorMessage = nil } })) {
             Button("OK") { store.errorMessage = nil }
         } message: { Text(store.errorMessage ?? "") }
+    }
+
+    private func toggleSearch() {
+        showsSearch.toggle()
+        if showsSearch {
+            DispatchQueue.main.async { searchFocused = true }
+        } else {
+            search = ""
+            searchFocused = false
+            beginReading()
+        }
+    }
+
+    private func closeSearch() {
+        showsSearch = false
+        search = ""
+        searchFocused = false
+        beginReading()
+    }
+
+    private func handleEscapeOrHide() {
+        if showsSearch {
+            closeSearch()
+        } else {
+            hide()
+        }
+    }
+
+    private func handleNavigationKey(_ keyCode: UInt16, notes: [WorkNote]) {
+        guard !notes.isEmpty else { return }
+        if keyCode == 36 || keyCode == 76 { // Return / Enter
+            if let id = highlightedID ?? expandedID, let note = notes.first(where: { $0.id == id }) {
+                toggleExpanded(note)
+            } else if let first = notes.first {
+                highlightedID = first.id
+                toggleExpanded(first)
+            }
+            return
+        }
+        let currentID = highlightedID ?? expandedID
+        let currentIndex = currentID.flatMap { id in notes.firstIndex { $0.id == id } }
+        let nextIndex: Int
+        if keyCode == 125 { // Down arrow
+            nextIndex = currentIndex.map { min(notes.count - 1, $0 + 1) } ?? 0
+        } else { // Up arrow (126)
+            nextIndex = currentIndex.map { max(0, $0 - 1) } ?? (notes.count - 1)
+        }
+        highlightedID = notes[nextIndex].id
+    }
+
+    private func copyToPasteboard(_ note: WorkNote) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(note.formattedText(), forType: .string)
     }
 
     private func floatingButton(_ label: String, symbol: String, action: @escaping () -> Void) -> some View {
@@ -209,7 +299,8 @@ struct BoardView: View {
     }
 
     private func move(_ source: UUID, relativeTo target: UUID, after: Bool) {
-        var ids = visibleNotes.filter { note in store.notes.contains { $0.id == note.id } }.map(\.id)
+        let savedIDs = Set(store.notes.map(\.id))
+        var ids = visibleNotes.filter { savedIDs.contains($0.id) }.map(\.id)
         guard source != target, let from = ids.firstIndex(of: source), ids.contains(target) else { return }
         ids.remove(at: from)
         guard let to = ids.firstIndex(of: target) else { return }
@@ -227,6 +318,7 @@ struct BoardView: View {
         drafts[note.id] = note
         newNotes.insert(note, at: 0)
         expandedID = note.id
+        highlightedID = note.id
     }
 
     private func discard(_ note: WorkNote) {
@@ -348,18 +440,23 @@ private struct EditablePostIt: View, Equatable {
     let staleDays: Int?
     let language: AppLanguage
     let isExpanded: Bool
+    let isHighlighted: Bool
     let isNew: Bool
     let expand: () -> Void
     let complete: (NoteCategory?) -> Void
     let delete: () -> Void
+    let copyNote: () -> Void
     @State private var showsLink = false
     @State private var showsHistory = false
+    @State private var showsCustomReminder = false
+    @State private var customReminderDate = Date().addingTimeInterval(3600)
     @AppStorage(ReminderScheduler.deniedKey) private var notificationsDenied = false
     @State private var linkError: String?
     private let ink = Color(red: 0.19, green: 0.22, blue: 0.19)
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.value == rhs.value && lhs.staleDays == rhs.staleDays && lhs.language == rhs.language && lhs.isExpanded == rhs.isExpanded && lhs.isNew == rhs.isNew
+        lhs.value == rhs.value && lhs.staleDays == rhs.staleDays && lhs.language == rhs.language
+            && lhs.isExpanded == rhs.isExpanded && lhs.isHighlighted == rhs.isHighlighted && lhs.isNew == rhs.isNew
     }
 
     var body: some View {
@@ -371,8 +468,12 @@ private struct EditablePostIt: View, Equatable {
                     Image(systemName: "line.3.horizontal")
                         .font(.system(size: 12)).opacity(0.55).frame(width: 20, height: 28)
                         .overlay(PaperOpenArea(id: note.id, title: note.title, color: note.color,
-                                               open: {}, opensOnClick: false))
+                                               open: {}, opensOnClick: false, onDropLink: acceptDroppedLink))
                         .help(L("Trascina per riordinare", "Drag to reorder"))
+                    Button(action: copyNote) { Image(systemName: "doc.on.doc").font(.system(size: 11)).padding(4) }
+                        .buttonStyle(.plain).opacity(0.55)
+                        .help(L("Copia come testo (⌘⇧C)", "Copy as text (⌘⇧C)"))
+                        .accessibilityLabel(L("Copia come testo", "Copy as text"))
                     Button(action: delete) { Image(systemName: "trash").font(.system(size: 11)).padding(4) }
                         .buttonStyle(.plain).opacity(0.55)
                         .help(L("Elimina lavoro", "Delete note"))
@@ -410,7 +511,7 @@ private struct EditablePostIt: View, Equatable {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(L("Cartella di lavoro o URL", "Work folder or URL")).font(.system(size: 10, weight: .semibold)).opacity(0.6)
                         PaperTextEditor(text: Binding(get: { note.workLink ?? "" }, set: { note.workLink = $0.isEmpty ? nil : $0 }),
-                                        placeholder: L("https://… oppure scegli una cartella", "https://… or choose a folder"),
+                                        placeholder: L("https://… oppure scegli o trascina una cartella", "https://… or choose or drop a folder"),
                                         label: L("Cartella di lavoro o URL", "Work folder or URL"), fontSize: 16)
                         HStack(spacing: 14) {
                             Button(action: chooseFolder) { Label(L("Scegli cartella", "Choose folder"), systemImage: "folder") }
@@ -486,8 +587,13 @@ private struct EditablePostIt: View, Equatable {
                         Text(note.title.isEmpty ? L("Nuovo lavoro", "New note") : note.title)
                             .font(PostItType.title()).lineLimit(1).minimumScaleFactor(0.7).multilineTextAlignment(.leading)
                         Spacer(minLength: 0)
-                        if note.action == .waiting, note.completedAt == nil, let date = note.reminderAt, date > Date() {
-                            Image(systemName: "bell.fill").font(.system(size: 9)).opacity(0.5)
+                        if WorkLink.url(for: note.workLink) != nil {
+                            Image(systemName: WorkLink.isFolder(note.workLink) ? "folder" : "link")
+                                .font(.system(size: 9)).opacity(0.5)
+                        }
+                        if note.action == .waiting, note.completedAt == nil, let date = note.reminderAt {
+                            Image(systemName: date > Date() ? "bell.fill" : "bell.badge.fill")
+                                .font(.system(size: 9)).opacity(date > Date() ? 0.5 : 0.85)
                         }
                         if let completedAt = note.completedAt {
                             Text(completedAt.localized(.dateTime.day().month(.abbreviated)))
@@ -504,7 +610,7 @@ private struct EditablePostIt: View, Equatable {
                         .padding(.horizontal, 24).padding(.bottom, 18)
                         .accessibilityHidden(true)
                         .overlay(PaperOpenArea(id: note.id, title: collapsedLabel, color: note.color, open: expand,
-                                               contextItems: contextItems))
+                                               contextItems: contextItems, onDropLink: acceptDroppedLink))
             }
         }
         .padding(.horizontal, isExpanded ? 24 : 0)
@@ -514,9 +620,17 @@ private struct EditablePostIt: View, Equatable {
         // Shadow only the paper image: shadowing the whole card forces an offscreen pass
         // over every text view and control on each redraw.
         .background(PaperSurface(color: note.color).shadow(color: .black.opacity(0.16), radius: 3, x: 0, y: -2))
+        .overlay {
+            if isHighlighted {
+                RoundedRectangle(cornerRadius: 4).strokeBorder(ink.opacity(0.35), lineWidth: 1.5).allowsHitTesting(false)
+            }
+        }
         // Stuck on the top-left corner, half over the edge, clear of the title.
         .overlay(alignment: .topLeading) {
             if note.isPriority && note.completedAt == nil { PrioritySticker().offset(x: -6, y: -6).allowsHitTesting(false) }
+        }
+        .onDrop(of: [.fileURL, .url, .plainText], isTargeted: nil) { providers in
+            handleSwiftUIDrop(providers)
         }
         .onChange(of: linkError) { _, message in
             if message != nil { NSApp.activate(ignoringOtherApps: true) }
@@ -537,7 +651,20 @@ private struct EditablePostIt: View, Equatable {
 
     private var contextItems: [PaperOpenArea.ContextItem] {
         var items: [PaperOpenArea.ContextItem] = []
-        if note.completedAt == nil { items.append(.init(title: priorityActionTitle, action: togglePriority)) }
+        if note.completedAt == nil {
+            if hasNextStep {
+                items.append(.init(title: L("Passo fatto", "Mark step done"), action: advanceStep))
+            }
+            items.append(.init(title: priorityActionTitle, action: togglePriority))
+        }
+        if WorkLink.url(for: note.workLink) != nil {
+            let openTitle = WorkLink.isFolder(note.workLink)
+                ? L("Apri cartella collegata", "Open linked folder")
+                : L("Apri URL collegato", "Open linked URL")
+            items.append(.init(title: openTitle, action: openWorkLink))
+        }
+        items.append(.init(title: L("Copia come testo", "Copy as text"), action: copyNote))
+        items.append(.separator())
         items.append(.init(title: L("Elimina lavoro…", "Delete note…"), action: delete))
         return items
     }
@@ -551,21 +678,73 @@ private struct EditablePostIt: View, Equatable {
         edit(L("Priorità", "Priority")) { $0.priority = $0.isPriority ? nil : true }
     }
 
+    private func acceptDroppedLink(_ link: String) {
+        edit(L("Collega cartella o URL", "Link folder or URL")) { $0.workLink = link }
+        if isExpanded { showsLink = true }
+    }
+
+    private func handleSwiftUIDrop(_ providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first else { return false }
+        if provider.hasItemConformingToTypeIdentifier("public.file-url") {
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                guard let url, let valid = WorkLink.url(for: url.path) else { return }
+                Task { @MainActor in acceptDroppedLink(valid.path) }
+            }
+            return true
+        }
+        if provider.hasItemConformingToTypeIdentifier("public.url") {
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                guard let url, let valid = WorkLink.url(for: url.absoluteString) else { return }
+                Task { @MainActor in acceptDroppedLink(valid.isFileURL ? valid.path : valid.absoluteString) }
+            }
+            return true
+        }
+        return false
+    }
+
     // "In attesa" can ring later: macOS shows a notification that opens this post-it.
     private var reminder: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Menu {
                 ForEach(ReminderPreset.allCases) { preset in
-                    Button(preset.label) { edit(L("Promemoria", "Reminder")) { $0.reminderAt = preset.date() } }
+                    Button(preset.label) {
+                        showsCustomReminder = false
+                        edit(L("Promemoria", "Reminder")) { $0.reminderAt = preset.date() }
+                    }
+                }
+                Divider()
+                Button(L("Data e ora…", "Custom date & time…")) {
+                    customReminderDate = note.reminderAt ?? ReminderPreset.tomorrow.date()
+                    showsCustomReminder = true
                 }
                 if note.reminderAt != nil {
                     Divider()
-                    Button(L("Rimuovi promemoria", "Remove reminder")) { edit(L("Rimuovi promemoria", "Remove reminder")) { $0.reminderAt = nil } }
+                    Button(L("Rimuovi promemoria", "Remove reminder")) {
+                        showsCustomReminder = false
+                        edit(L("Rimuovi promemoria", "Remove reminder")) { $0.reminderAt = nil }
+                    }
                 }
             } label: {
                 Label(reminderText, systemImage: note.reminderAt == nil ? "bell" : "bell.fill")
                     .font(.system(size: 10, weight: .semibold))
             }.menuStyle(.borderlessButton).fixedSize().accessibilityLabel(reminderText)
+            if showsCustomReminder {
+                HStack(spacing: 8) {
+                    DatePicker("", selection: $customReminderDate, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                        .labelsHidden()
+                        .datePickerStyle(.compact)
+                        .controlSize(.small)
+                    Button(L("Imposta", "Set")) {
+                        showsCustomReminder = false
+                        edit(L("Promemoria", "Reminder")) { $0.reminderAt = customReminderDate }
+                    }.font(.system(size: 10, weight: .semibold)).buttonStyle(.plain)
+                    Button {
+                        showsCustomReminder = false
+                    } label: {
+                        Image(systemName: "xmark").font(.system(size: 9))
+                    }.buttonStyle(.plain).opacity(0.6)
+                }
+            }
             if notificationsDenied, note.reminderAt != nil {
                 Text(L("Attiva le notifiche di What’s Next? in Impostazioni di Sistema › Notifiche.",
                        "Turn on notifications for What’s Next? in System Settings › Notifications."))
@@ -630,7 +809,7 @@ private struct EditablePostIt: View, Equatable {
         picker.allowsMultipleSelection = false
         if let current = WorkLink.url(for: note.workLink), current.isFileURL { picker.directoryURL = current }
         NSApp.activate(ignoringOtherApps: true)
-        if picker.runModal() == .OK, let url = picker.url { edit(L("Scegli cartella", "Choose folder")) { $0.workLink = url.absoluteString } }
+        if picker.runModal() == .OK, let url = picker.url { edit(L("Scegli cartella", "Choose folder")) { $0.workLink = url.path } }
     }
 
     private func openWorkLink() {

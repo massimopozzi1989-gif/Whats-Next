@@ -97,6 +97,31 @@ struct WorkNote: Identifiable, Codable, Equatable {
 
     var trimmedNextStep: String { nextStep.trimmingCharacters(in: .whitespacesAndNewlines) }
 
+    // Plain-text summary for copying to the clipboard or sharing.
+    func formattedText() -> String {
+        var lines: [String] = []
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        lines.append(cleanTitle.isEmpty ? L("Nuovo lavoro", "New note") : cleanTitle)
+        let cleanProgress = progress.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !cleanProgress.isEmpty {
+            lines.append("\(L("Dove sono arrivato", "Where I left off")): \(cleanProgress)")
+        }
+        let cleanNext = trimmedNextStep
+        if !cleanNext.isEmpty {
+            lines.append("\(action.label): \(cleanNext)")
+        }
+        if let link = workLink?.trimmingCharacters(in: .whitespacesAndNewlines), !link.isEmpty {
+            lines.append("\(L("Collegamento", "Link")): \(link)")
+        }
+        if !steps.isEmpty {
+            let items = steps.reversed().map { entry in
+                "- \(entry.date.localized(.dateTime.day().month(.abbreviated))): \(entry.text)"
+            }
+            lines.append(([L("Percorso:", "Path:")] + items).joined(separator: "\n"))
+        }
+        return lines.joined(separator: "\n")
+    }
+
     // "Fatto": the next step becomes where I am; the previous point moves to the history.
     @discardableResult
     mutating func advanceStep(at date: Date = Date()) -> Bool {
@@ -124,6 +149,12 @@ struct WorkNote: Identifiable, Codable, Equatable {
         if action == .waiting, let reminderAt, reminderAt > now { return nil }
         let days = idleDays(now: now, calendar: calendar)
         return days >= threshold ? days : nil
+    }
+
+    // An open waiting note whose reminder time has already passed.
+    func isDueReminder(now: Date = Date()) -> Bool {
+        guard completedAt == nil, action == .waiting, let reminderAt else { return false }
+        return reminderAt <= now
     }
 
     // Notes with the priority sticker come first; each group keeps its manual order.

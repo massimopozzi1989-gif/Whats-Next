@@ -6,6 +6,12 @@ import Combine
 extension Notification.Name {
     // ⌘↩ in the panel: "Fatto" on the open post-it.
     static let postItAdvanceStep = Notification.Name("it.massimopozzi.postit.advance-step")
+    // ⌘F in the panel: open/focus the search bar.
+    static let postItToggleSearch = Notification.Name("it.massimopozzi.postit.toggle-search")
+    // ⌘⇧C in the panel: copy the open or selected note as plain text.
+    static let postItCopyNote = Notification.Name("it.massimopozzi.postit.copy-note")
+    // ↑ / ↓ / ↩ when no text editor is focused: navigate and toggle sheets.
+    static let postItNavigateKey = Notification.Name("it.massimopozzi.postit.navigate-key")
 }
 
 @main
@@ -33,11 +39,19 @@ final class NotesPanel: NSPanel {
         super.sendEvent(event)
     }
 
-    // Handle ⌘Z / ⌘⇧Z here, before the menu: this menu-bar app has no visible Edit menu.
+    // Handle ⌘Z / ⌘⇧Z and panel shortcuts here, before the menu: this menu-bar app has no visible Edit menu.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection([.command, .shift, .option, .control])
         if flags == .command, event.keyCode == 36 || event.keyCode == 76 { // Return, keypad Enter
             NotificationCenter.default.post(name: .postItAdvanceStep, object: self)
+            return true
+        }
+        if flags == .command, event.charactersIgnoringModifiers?.lowercased() == "f" {
+            NotificationCenter.default.post(name: .postItToggleSearch, object: self)
+            return true
+        }
+        if flags == [.command, .shift], event.charactersIgnoringModifiers?.lowercased() == "c" {
+            NotificationCenter.default.post(name: .postItCopyNote, object: self)
             return true
         }
         // While another app stays active its menu bar owns the shortcuts: route editing ones here.
@@ -59,6 +73,17 @@ final class NotesPanel: NSPanel {
         }
         return super.performKeyEquivalent(with: event)
     }
+
+    override func keyDown(with event: NSEvent) {
+        let flags = event.modifierFlags.intersection([.command, .shift, .option, .control])
+        if flags.isEmpty, !(firstResponder is NSTextView) {
+            if event.keyCode == 125 || event.keyCode == 126 || event.keyCode == 36 || event.keyCode == 76 {
+                NotificationCenter.default.post(name: .postItNavigateKey, object: self, userInfo: ["keyCode": event.keyCode])
+                return
+            }
+        }
+        super.keyDown(with: event)
+    }
 }
 
 @MainActor
@@ -71,7 +96,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panelHeight: CGFloat = 136
     private let reminders = ReminderScheduler()
     private var reminderSubscription: AnyCancellable?
+    private var badgeTimer: Timer?
     private var publishedLanguage: AppLanguage?
+    private var lastShortcutSpec: ShortcutSpec?
 
     override init() {
         super.init()
@@ -95,11 +122,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         registerEventHandlers()
-        UserDefaults.standard.register(defaults: ["hideAfterSave": true, "keepOnTop": true, "showAtLaunch": true, "staleAfterDays": 7])
+        UserDefaults.standard.register(defaults: ["keepOnTop": true, "showAtLaunch": true, "staleAfterDays": 7])
         NotificationCenter.default.addObserver(self, selector: #selector(applyPreferences), name: UserDefaults.didChangeNotification, object: nil)
         NSApp.setActivationPolicy(.accessory)
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.image = NSImage(systemSymbolName: "note.text", accessibilityDescription: "What’s Next?")
+        statusItem.button?.imagePosition = .imageLeading
         statusItem.button?.target = self
         statusItem.button?.action = #selector(togglePanel)
 
@@ -118,6 +146,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = false
         panel.isMovableByWindowBackground = false
+        let initialSpec = ShortcutSpec.load()
+        lastShortcutSpec = initialSpec
+        shortcut = PanelShortcut(spec: initialSpec) { [weak self] in self?.togglePanel() }
         applyPreferences()
         panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
         let maxHeight = min(680, (NSScreen.main?.visibleFrame.height ?? 800) - 32)
@@ -128,17 +159,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hosting.wantsLayer = true
         hosting.layer?.backgroundColor = NSColor.clear.cgColor
         panel.contentView = hosting
-        shortcut = PanelShortcut { [weak self] in self?.togglePanel() }
-        UserDefaults.standard.set(shortcut?.isRegistered == true, forKey: "panelShortcutAvailable")
         observeWidgetActions()
         LoginItem.enableByDefaultOnce()
         reminders.open = { [weak self] url in self?.openPanel(for: url) }
-        reminderSubscription = store.$notes.sink { [weak self] notes in self?.reminders.reconcile(notes) }
+        reminderSubscription = store.$notes.sink { [weak self] notes in
+            self?.reminders.reconcile(notes)
+            self?.updateStatusBadge(notes: notes)
+        }
+        badgeTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.updateStatusBadge(notes: self.store.notes)
+            }
+        }
         if store.applyWidgetActions() == 0 { store.refreshWidgets() }
         if let url = pendingURL {
             pendingURL = nil
             openPanel(for: url)
         } else if UserDefaults.standard.bool(forKey: "showAtLaunch") { showPanel() }
+    }
+
+    private func updateStatusBadge(notes: [WorkNote], now: Date = Date()) {
+        let dueCount = notes.filter { $0.isDueReminder(now: now) }.count
+        statusItem?.button?.title = dueCount > 0 ? "•" : ""
     }
 
     // The widget's "Fatto" posts a Darwin notification after queueing its action.
@@ -157,7 +200,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func applyPreferences() {
         panel?.level = UserDefaults.standard.bool(forKey: "keepOnTop") ? .floating : .normal
-        statusItem?.button?.toolTip = L("What’s Next? — ⌃⌥Spazio", "What’s Next? — ⌃⌥Space")
+        let spec = ShortcutSpec.load()
+        if spec != lastShortcutSpec {
+            lastShortcutSpec = spec
+            shortcut?.update(to: spec)
+        }
+        statusItem?.button?.toolTip = "What’s Next? — \(spec.displayString)"
+        updateStatusBadge(notes: store.notes)
         // Hand a language change to the widget and to pending reminder texts.
         let language = AppLanguage.current
         guard language != publishedLanguage else { return }
@@ -169,6 +218,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func application(_ application: NSApplication, open urls: [URL]) {
         if let url = urls.first { openPanel(for: url) }
+    }
+
+    func application(_ application: NSApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([any NSUserActivityRestoring]) -> Void) -> Bool {
+        if let id = SpotlightIndexer.noteID(from: userActivity) {
+            openPanel(for: URL(string: "dovesonoarrivato://note/\(id.uuidString)")!)
+            return true
+        }
+        return false
     }
 
     @objc private func handleURL(_ event: NSAppleEventDescriptor, reply: NSAppleEventDescriptor) {
@@ -236,6 +293,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showPanel() {
         let wasHidden = !panel.isVisible
         if wasHidden { store.applyWidgetActions() }
+        updateStatusBadge(notes: store.notes)
         let screen = NSScreen.screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }) ?? NSScreen.main
         if let frame = screen?.visibleFrame {
             let height = min(panelHeight, frame.height - 32)

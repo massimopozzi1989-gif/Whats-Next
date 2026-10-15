@@ -3,6 +3,13 @@ import Foundation
 struct NoteDragRow {
     let id: UUID
     let frame: CGRect
+    var isPriority: Bool = false
+
+    init(id: UUID, frame: CGRect, isPriority: Bool = false) {
+        self.id = id
+        self.frame = frame
+        self.isPriority = isPriority
+    }
 }
 
 struct NoteDragPlacement: Equatable {
@@ -10,17 +17,28 @@ struct NoteDragPlacement: Equatable {
     let after: Bool
     let indicatorY: CGFloat
 
-    static func resolve(y: CGFloat, rows: [NoteDragRow]) -> NoteDragPlacement? {
-        let rows = rows.sorted { $0.frame.minY < $1.frame.minY }
-        for index in rows.indices {
+    static func resolve(y: CGFloat, rows: [NoteDragRow], sourceID: UUID? = nil) -> NoteDragPlacement? {
+        let sorted = rows.sorted { $0.frame.minY < $1.frame.minY }
+        // Priority notes stay at the top of the stack; constrain drop targets to the same group
+        // so the blue insertion line always matches where the card actually lands.
+        let filtered: [NoteDragRow]
+        if let sourceID, let sourceRow = sorted.first(where: { $0.id == sourceID }) {
+            let group = sorted.filter { $0.isPriority == sourceRow.isPriority }
+            filtered = group.isEmpty ? sorted : group
+        } else {
+            filtered = sorted
+        }
+        for index in filtered.indices {
             // Overlapping paper hides the previous sheet's lower edge. Use the visible
             // strip, so the upper/lower halves agree with what the person actually sees.
-            let end = index + 1 < rows.count ? rows[index + 1].frame.minY : rows[index].frame.maxY
-            if y < (rows[index].frame.minY + end) / 2 {
-                return NoteDragPlacement(target: rows[index].id, after: false, indicatorY: rows[index].frame.minY)
+            let row = filtered[index]
+            let nextInAll = sorted.first { $0.frame.minY > row.frame.minY }
+            let end = min(row.frame.maxY, nextInAll?.frame.minY ?? row.frame.maxY)
+            if y < (row.frame.minY + end) / 2 {
+                return NoteDragPlacement(target: row.id, after: false, indicatorY: row.frame.minY)
             }
         }
-        guard let last = rows.last else { return nil }
+        guard let last = filtered.last else { return nil }
         return NoteDragPlacement(target: last.id, after: true, indicatorY: last.frame.maxY)
     }
 

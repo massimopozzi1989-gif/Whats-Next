@@ -6,11 +6,19 @@ struct SettingsView: View {
     @AppStorage("showAtLaunch") private var showAtLaunch = true
     @AppStorage("defaultPaperColor") private var defaultPaperColor = PaperColor.yellow.rawValue
     @AppStorage("panelShortcutAvailable") private var panelShortcutAvailable = false
+    @AppStorage(ShortcutSpec.keyCodeKey) private var shortcutKeyCode = Int(ShortcutSpec.defaultSpec.keyCode)
+    @AppStorage(ShortcutSpec.modifiersKey) private var shortcutModifiers = Int(ShortcutSpec.defaultSpec.carbonModifiers)
     @AppStorage("staleAfterDays") private var staleAfterDays = 7
     @AppStorage(AppLanguage.key) private var language = AppLanguage.system.rawValue
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var loginNeedsApproval = LoginItem.needsApproval
     @State private var loginError: String?
+    @State private var isRecordingShortcut = false
+    @State private var keyMonitor: Any?
+
+    private var currentShortcut: ShortcutSpec {
+        ShortcutSpec(keyCode: UInt32(shortcutKeyCode), carbonModifiers: UInt32(shortcutModifiers))
+    }
 
     var body: some View {
         Form {
@@ -24,10 +32,26 @@ struct SettingsView: View {
                     .font(.callout).foregroundStyle(.secondary)
             }
             Section(L("Pannello", "Panel")) {
+                HStack {
+                    Text(L("Scorciatoia globale", "Global shortcut"))
+                    Spacer()
+                    Button(isRecordingShortcut ? L("Premi i tasti… (Esc annulla)", "Press keys… (Esc cancels)") : currentShortcut.displayString) {
+                        toggleRecording()
+                    }
+                    if currentShortcut != ShortcutSpec.defaultSpec {
+                        Button(L("Ripristina", "Reset")) {
+                            stopRecording()
+                            ShortcutSpec.reset()
+                            shortcutKeyCode = Int(ShortcutSpec.defaultSpec.keyCode)
+                            shortcutModifiers = Int(ShortcutSpec.defaultSpec.carbonModifiers)
+                        }
+                    }
+                }
                 Text(panelShortcutAvailable
-                     ? L("Apri o nascondi i post-it da qualsiasi app con ⌃⌥Spazio.", "Show or hide your notes from any app with ⌃⌥Space.")
-                     : L("La scorciatoia ⌃⌥Spazio non è disponibile. Apri i post-it dalla barra dei menu.",
-                         "The ⌃⌥Space shortcut is taken. Open your notes from the menu bar."))
+                     ? L("Apri o nascondi i post-it da qualsiasi app con \(currentShortcut.displayString).",
+                         "Show or hide your notes from any app with \(currentShortcut.displayString).")
+                     : L("La scorciatoia \(currentShortcut.displayString) non è disponibile. Scegline un’altra o apri i post-it dalla barra dei menu.",
+                         "The \(currentShortcut.displayString) shortcut is taken. Pick another one or open your notes from the menu bar."))
                     .font(.callout).foregroundStyle(.secondary)
                 Toggle(L("Mantieni il pannello sopra le altre finestre", "Keep the panel above other windows"), isOn: $keepOnTop)
                 Toggle(L("Mostra il pannello quando apri l’app", "Show the panel when the app opens"), isOn: $showAtLaunch)
@@ -92,6 +116,38 @@ struct SettingsView: View {
                 .font(.caption).foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 700)
+        .frame(width: 460, height: 740)
+        .onDisappear { stopRecording() }
+    }
+
+    private func toggleRecording() {
+        if isRecordingShortcut {
+            stopRecording()
+            return
+        }
+        isRecordingShortcut = true
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == 53 { // Escape cancels
+                stopRecording()
+                return nil
+            }
+            guard let spec = ShortcutSpec.from(event: event) else {
+                NSSound.beep()
+                return nil
+            }
+            spec.save()
+            shortcutKeyCode = Int(spec.keyCode)
+            shortcutModifiers = Int(spec.carbonModifiers)
+            stopRecording()
+            return nil
+        }
+    }
+
+    private func stopRecording() {
+        if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyMonitor = nil
+        }
+        isRecordingShortcut = false
     }
 }

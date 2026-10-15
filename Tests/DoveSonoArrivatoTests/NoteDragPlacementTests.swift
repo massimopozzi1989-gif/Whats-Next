@@ -29,4 +29,23 @@ final class NoteDragPlacementTests: XCTestCase {
         XCTAssertLessThan(NoteDragPlacement.scrollDelta(y: 0, viewportHeight: 300), NoteDragPlacement.scrollDelta(y: 30, viewportHeight: 300))
         XCTAssertGreaterThan(NoteDragPlacement.scrollDelta(y: 300, viewportHeight: 300), NoteDragPlacement.scrollDelta(y: 270, viewportHeight: 300))
     }
+
+    func testPriorityAndRegularNotesStayWithinTheirGroupDuringDrag() {
+        let p1 = UUID(), p2 = UUID(), r1 = UUID(), r2 = UUID()
+        let rows = [
+            NoteDragRow(id: p1, frame: CGRect(x: 0, y: 0, width: 360, height: 100), isPriority: true),
+            NoteDragRow(id: p2, frame: CGRect(x: 0, y: 82, width: 360, height: 100), isPriority: true),
+            NoteDragRow(id: r1, frame: CGRect(x: 0, y: 164, width: 360, height: 100), isPriority: false),
+            NoteDragRow(id: r2, frame: CGRect(x: 0, y: 246, width: 360, height: 100), isPriority: false)
+        ]
+        // Dragging a non-priority note above the priority group clamps to the top of non-priority notes.
+        let nonPriorityTop = NoteDragPlacement.resolve(y: 10, rows: rows, sourceID: r2)
+        XCTAssertEqual(nonPriorityTop?.target, r1)
+        XCTAssertEqual(nonPriorityTop?.after, false)
+
+        // Dragging a priority note below the priority group clamps to the bottom of priority notes.
+        let priorityBottom = NoteDragPlacement.resolve(y: 300, rows: rows, sourceID: p1)
+        XCTAssertEqual(priorityBottom?.target, p2)
+        XCTAssertEqual(priorityBottom?.after, true)
+    }
 }

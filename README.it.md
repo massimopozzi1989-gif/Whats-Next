@@ -21,14 +21,16 @@ Passare da un progetto all’altro costa soprattutto nei primi dieci minuti: ril
 ## Funzioni
 
 - **Un foglio per lavoro, impilati come carta.** Di ogni foglio si vede solo la fascia del titolo: un clic in qualsiasi punto lo apre. Trascina un foglio chiuso per riordinare la pila.
-- **Fatto ti porta avanti.** Premi **Fatto** (o **⌘↩**): il prossimo passo diventa “Dove sono arrivato”, pronto per quello successivo. Il punto precedente resta, con la data, nel **Percorso** del foglio.
-- **Prossimo passo o In attesa.** Segna ciò che stai aspettando e imposta un promemoria: tra un’ora, domani alle 9, lunedì… All’ora giusta una notifica di macOS apre quel post-it.
+- **Fatto ti porta avanti.** Premi **Fatto** (o **⌘↩**, oppure dal clic destro sul foglio chiuso): il prossimo passo diventa “Dove sono arrivato”, pronto per quello successivo. Il punto precedente resta, con la data, nel **Percorso** del foglio.
+- **Prossimo passo o In attesa.** Segna ciò che stai aspettando e imposta un promemoria: tra un’ora, domani alle 9, lunedì, oppure una data e ora personalizzata. All’ora giusta una notifica di macOS apre quel post-it, e un pallino discreto sull’icona nella barra dei menu segnala i promemoria scaduti.
 - **Un adesivo per le priorità.** Attacca un adesivo rosso di priorità a qualsiasi foglio, dal foglio aperto o con il clic destro: si vede sulla carta nel pannello e nel widget, dove i fogli con priorità vengono per primi.
 - **Uno scaffale per il lavoro finito.** Completa un foglio come **App**, **Sito web** o **Altro**: la lista Completati li raggruppa per tipo, dal più recente, con la data di completamento.
 - **I lavori fermi mostrano un orologio.** I fogli non toccati da 7 giorni (oppure 3, 14, 30 o mai, a tua scelta) indicano da quanto sono fermi.
 - **Un widget che fa qualcosa.** Widget piccolo, medio e grande con la pila nell’ordine dell’app; tocca ↰ su un foglio per segnare fatto il passo senza aprire l’app.
-- **Non ti disturba.** Vive nella barra dei menu, si apre con **⌃⌥Spazio** da qualsiasi app e non ruba il focus: l’app che stavi usando conserva la barra dei menu e torna in primo piano con Esc.
-- **Collegamenti al lavoro.** Associa a ogni foglio una cartella o un URL e aprili da lì.
+- **Non ti disturba.** Vive nella barra dei menu, si avvia all’accesso, si apre con **⌃⌥Spazio** (o con una scorciatoia personalizzata) da qualsiasi app e non ruba il focus: l’app che stavi usando conserva la barra dei menu e torna in primo piano con Esc.
+- **Collegamenti al lavoro.** Associa a ogni foglio una cartella o un URL — anche trascinandoli direttamente dal Finder o dal browser sopra il post-it — e aprili dal foglio aperto o con il clic destro.
+- **Copia come testo.** Copia qualsiasi post-it come testo semplice con **⌘⇧C**, col pulsante sul foglio aperto o dal menu contestuale.
+- **Spotlight e Comandi Rapidi.** I post-it sono indicizzati localmente in Spotlight ed esposti a Comandi Rapidi e Siri tramite App Intents.
 - **Annulla tutto.** ⌘Z / ⌘⇧Z valgono per la scrittura e per ogni azione: Fatto, colore, promemoria, completa, riapri ed elimina (cestino sul foglio aperto, o clic destro su quello chiuso).
 - **Italiano e inglese**, da cambiare al volo nelle Impostazioni (anche il widget si adegua).
 - **Privata per natura.** Nessun account, nessuna rete, nessuna statistica. Le note sono un semplice file JSON sul tuo Mac.
@@ -49,11 +51,15 @@ Apri il Centro notifiche (clic sulla data nella barra dei menu), scegli **Modifi
 
 | Scorciatoia | Azione |
 | --- | --- |
-| ⌃⌥Spazio | Mostra o nasconde il pannello da qualsiasi app |
+| ⌃⌥Spazio (personalizzabile) | Mostra o nasconde il pannello da qualsiasi app |
 | ⌘N | Nuovo post-it |
+| ⌘F | Cerca un lavoro |
+| ↑ / ↓ / ↩ | Scorre tra i post-it e apre o chiude il foglio selezionato |
+| Tab / ⇧Tab | Passa da un campo all’altro del post-it aperto |
 | ⌘↩ | Fatto: sposta il prossimo passo in “Dove sono arrivato” |
+| ⌘⇧C | Copia il post-it come testo |
 | ⌘Z / ⌘⇧Z | Annulla / ripeti |
-| Esc | Nasconde il pannello |
+| Esc | Chiude la ricerca o nasconde il pannello |
 
 ## I tuoi dati
 
@@ -65,7 +71,7 @@ Servono Xcode 16 o successivo e [XcodeGen](https://github.com/yonaskolb/XcodeGen
 
 ```sh
 swift test                 # test (senza widget né App Group)
-zsh scripts/build-app.sh   # genera il progetto Xcode e crea dist/What's Next.app con il widget
+zsh scripts/build-app.sh   # genera il progetto Xcode e crea dist/What's Next.app con the widget
 zsh scripts/make-dmg.sh    # DMG firmato; notarizzato se esiste un profilo notarytool
 ```
 
