@@ -29,7 +29,7 @@ Passare da un progetto all’altro costa soprattutto nei primi dieci minuti: ril
 - **Un widget che fa qualcosa.** Widget piccolo, medio e grande con la pila nell’ordine dell’app; tocca ↰ su un foglio per segnare fatto il passo senza aprire l’app.
 - **Non ti disturba.** Vive nella barra dei menu, si apre con **⌃⌥Spazio** da qualsiasi app e non ruba il focus: l’app che stavi usando conserva la barra dei menu e torna in primo piano con Esc.
 - **Collegamenti al lavoro.** Associa a ogni foglio una cartella o un URL e aprili da lì.
-- **Annulla tutto.** ⌘Z / ⌘⇧Z valgono per la scrittura e per ogni azione: Fatto, colore, promemoria, completa e riapri.
+- **Annulla tutto.** ⌘Z / ⌘⇧Z valgono per la scrittura e per ogni azione: Fatto, colore, promemoria, completa, riapri ed elimina (cestino sul foglio aperto, o clic destro su quello chiuso).
 - **Italiano e inglese**, da cambiare al volo nelle Impostazioni (anche il widget si adegua).
 - **Privata per natura.** Nessun account, nessuna rete, nessuna statistica. Le note sono un semplice file JSON sul tuo Mac.
 

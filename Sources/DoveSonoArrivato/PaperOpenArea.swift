@@ -7,9 +7,13 @@ struct PaperOpenArea: NSViewRepresentable {
     let color: PaperColor
     let open: () -> Void
     var opensOnClick = true
-    // Right-click on the paper: one quick action, such as toggling the priority sticker.
-    var contextTitle: String?
-    var contextAction: (() -> Void)?
+    // Right-click on the paper: quick actions such as the priority sticker or deleting.
+    var contextItems: [ContextItem] = []
+
+    struct ContextItem {
+        let title: String
+        let action: () -> Void
+    }
 
     func makeNSView(context: Context) -> OpenView { OpenView(frame: .zero) }
     func updateNSView(_ view: OpenView, context: Context) {
@@ -18,8 +22,7 @@ struct PaperOpenArea: NSViewRepresentable {
         view.paperColor = NSColor(color.paper)
         view.open = open
         view.opensOnClick = opensOnClick
-        view.contextTitle = contextTitle
-        view.contextAction = contextAction
+        view.contextItems = contextItems
         view.setAccessibilityElement(true)
         view.setAccessibilityRole(opensOnClick ? .button : .image)
         view.setAccessibilityLabel(title)
@@ -34,8 +37,7 @@ struct PaperOpenArea: NSViewRepresentable {
         var paperColor = NSColor.yellow
         var open: (() -> Void)?
         var opensOnClick = true
-        var contextTitle: String?
-        var contextAction: (() -> Void)?
+        var contextItems: [ContextItem] = []
         private var start = NSPoint.zero
         private var isDragging = false
         private var didDrag = false
@@ -80,14 +82,20 @@ struct PaperOpenArea: NSViewRepresentable {
             if opensOnClick && !didDrag && !isDragging && bounds.contains(convert(event.locationInWindow, from: nil)) { open?() }
         }
         override func menu(for event: NSEvent) -> NSMenu? {
-            guard let contextTitle, contextAction != nil else { return nil }
+            guard !contextItems.isEmpty else { return nil }
             let menu = NSMenu()
-            let item = NSMenuItem(title: contextTitle, action: #selector(runContextAction), keyEquivalent: "")
-            item.target = self
-            menu.addItem(item)
+            for (index, entry) in contextItems.enumerated() {
+                let item = NSMenuItem(title: entry.title, action: #selector(runContextItem(_:)), keyEquivalent: "")
+                item.target = self
+                item.tag = index
+                menu.addItem(item)
+            }
             return menu
         }
-        @objc private func runContextAction() { contextAction?() }
+        @objc private func runContextItem(_ sender: NSMenuItem) {
+            guard contextItems.indices.contains(sender.tag) else { return }
+            contextItems[sender.tag].action()
+        }
         func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { .move }
         func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) { isDragging = false }
         override func accessibilityPerformPress() -> Bool {

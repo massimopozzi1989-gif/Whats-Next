@@ -149,6 +149,20 @@ final class NoteStore: ObservableObject {
         return true
     }
 
+    // Remove a note from the file and the widget. The panel keeps a copy for ⌘Z.
+    func delete(id: UUID) -> Bool {
+        guard pendingEdits.isEmpty || flushPendingEdits() else { return false }
+        guard notes.contains(where: { $0.id == id }) else { return true }
+        return persist(notes.filter { $0.id != id })
+    }
+
+    // Undo of a deletion: the note comes back exactly as it was, in the same place.
+    func restore(_ note: WorkNote) -> Bool {
+        guard pendingEdits.isEmpty || flushPendingEdits() else { return false }
+        guard !notes.contains(where: { $0.id == note.id }) else { return true }
+        return persist(notes + [note])
+    }
+
     func reorder(_ ids: [UUID]) -> Bool {
         guard pendingEdits.isEmpty || flushPendingEdits() else { return false }
         let selected = Set(ids)

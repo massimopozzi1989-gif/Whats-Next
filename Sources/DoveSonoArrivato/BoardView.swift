@@ -14,6 +14,7 @@ struct BoardView: View {
     @State private var search = ""
     @State private var showsSearch = false
     @State private var expandedID: UUID?
+    @State private var pendingDeletion: WorkNote?
     @AppStorage("defaultPaperColor") private var defaultPaperColor = PaperColor.yellow.rawValue
     @Environment(\.openSettings) private var openSettings
     @AppStorage("staleAfterDays") private var staleAfterDays = 7
@@ -102,7 +103,8 @@ struct BoardView: View {
                                            isExpanded: expandedID == note.id,
                                            isNew: newIDs.contains(note.id),
                                            expand: { toggleExpanded(note) },
-                                           complete: { toggleCompleted(note, category: $0) })
+                                           complete: { toggleCompleted(note, category: $0) },
+                                           delete: { requestDeletion(note) })
                                 // Typing in one card must not rebuild every other sheet in the stack.
                                 .equatable()
                                 .background(BoardScrollMarker(id: note.id).allowsHitTesting(false).accessibilityHidden(true))
@@ -150,6 +152,19 @@ struct BoardView: View {
         }
         .onChange(of: store.errorMessage) { _, message in
             if message != nil { NSApp.activate(ignoringOtherApps: true) }
+        }
+        .onChange(of: pendingDeletion?.id) { _, id in
+            if id != nil { NSApp.activate(ignoringOtherApps: true) }
+        }
+        .alert(deletionTitle, isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } })) {
+            Button(L("Elimina", "Delete"), role: .destructive) {
+                if let note = pendingDeletion { delete(note) }
+                pendingDeletion = nil
+            }
+            Button(L("Annulla", "Cancel"), role: .cancel) { pendingDeletion = nil }
+        } message: {
+            Text(L("Il post-it sparisce dalla lista e dal widget. Subito dopo puoi recuperarlo con ⌘Z.",
+                   "The note disappears from the list and the widget. Right after, ⌘Z brings it back."))
         }
         .alert(L("Le note richiedono attenzione", "Your notes need attention"), isPresented: Binding(get: { store.errorMessage != nil }, set: { if !$0 { store.errorMessage = nil } })) {
             Button("OK") { store.errorMessage = nil }
@@ -241,6 +256,47 @@ struct BoardView: View {
                                name: previous == nil ? L("Completa", "Complete") : L("Riapri", "Reopen"))
     }
 
+    private var deletionTitle: String {
+        let title = pendingDeletion.map { $0.title.trimmingCharacters(in: .whitespacesAndNewlines) } ?? ""
+        return title.isEmpty ? L("Eliminare questo post-it?", "Delete this note?")
+                             : L("Eliminare «\(title)»?", "Delete “\(title)”?")
+    }
+
+    // A brand-new, still empty note goes at once; anything with content asks first.
+    private func requestDeletion(_ original: WorkNote) {
+        let note = current(original)
+        let isEmpty = [note.title, note.progress, note.nextStep].allSatisfy {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        if isEmpty && !store.notes.contains(where: { $0.id == note.id }) {
+            delete(note)
+        } else {
+            pendingDeletion = note
+        }
+    }
+
+    private func delete(_ original: WorkNote) {
+        let note = current(original)
+        let saved = store.notes.contains { $0.id == note.id }
+        if saved { guard store.delete(id: note.id) else { return } }
+        discard(note)
+        if expandedID == note.id { beginReading(); expandedID = nil }
+        PanelUndo.reset()
+        if saved { registerDeletionUndo(note) }
+    }
+
+    // ⌘Z puts a deleted note back; ⌘⇧Z deletes it again.
+    private func registerDeletionUndo(_ note: WorkNote) {
+        PanelUndo.register(L("Elimina", "Delete")) {
+            guard store.restore(note) else { return }
+            if note.completedAt != nil { completed = true }
+            PanelUndo.register(L("Elimina", "Delete")) {
+                guard store.delete(id: note.id) else { return }
+                registerDeletionUndo(note)
+            }
+        }
+    }
+
     // ⌘Z after Completa brings the card back to the list it came from, and vice versa.
     private func registerCompletionUndo(id: UUID, restore: Date?, redo: Date?, name: String) {
         PanelUndo.register(name) {
@@ -295,6 +351,7 @@ private struct EditablePostIt: View, Equatable {
     let isNew: Bool
     let expand: () -> Void
     let complete: (NoteCategory?) -> Void
+    let delete: () -> Void
     @State private var showsLink = false
     @State private var showsHistory = false
     @AppStorage(ReminderScheduler.deniedKey) private var notificationsDenied = false
@@ -316,6 +373,10 @@ private struct EditablePostIt: View, Equatable {
                         .overlay(PaperOpenArea(id: note.id, title: note.title, color: note.color,
                                                open: {}, opensOnClick: false))
                         .help(L("Trascina per riordinare", "Drag to reorder"))
+                    Button(action: delete) { Image(systemName: "trash").font(.system(size: 11)).padding(4) }
+                        .buttonStyle(.plain).opacity(0.55)
+                        .help(L("Elimina lavoro", "Delete note"))
+                        .accessibilityLabel(L("Elimina lavoro", "Delete note"))
                     Button(action: expand) { Image(systemName: "chevron.up").font(.system(size: 11)).padding(4) }
                         .buttonStyle(.plain).accessibilityLabel(L("Chiudi il post-it", "Close note"))
                 }
@@ -443,8 +504,7 @@ private struct EditablePostIt: View, Equatable {
                         .padding(.horizontal, 24).padding(.bottom, 18)
                         .accessibilityHidden(true)
                         .overlay(PaperOpenArea(id: note.id, title: collapsedLabel, color: note.color, open: expand,
-                                               contextTitle: note.completedAt == nil ? priorityActionTitle : nil,
-                                               contextAction: note.completedAt == nil ? togglePriority : nil))
+                                               contextItems: contextItems))
             }
         }
         .padding(.horizontal, isExpanded ? 24 : 0)
@@ -473,6 +533,13 @@ private struct EditablePostIt: View, Equatable {
         if note.isPriority { title = L("Priorità: ", "Priority: ") + title }
         guard let staleDays else { return title }
         return L("\(title), fermo da \(staleDays) giorni", "\(title), untouched for \(staleDays) days")
+    }
+
+    private var contextItems: [PaperOpenArea.ContextItem] {
+        var items: [PaperOpenArea.ContextItem] = []
+        if note.completedAt == nil { items.append(.init(title: priorityActionTitle, action: togglePriority)) }
+        items.append(.init(title: L("Elimina lavoro…", "Delete note…"), action: delete))
+        return items
     }
 
     private var priorityActionTitle: String {

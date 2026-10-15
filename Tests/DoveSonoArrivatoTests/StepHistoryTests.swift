@@ -110,3 +110,26 @@ final class CompletedSectionsTests: XCTestCase {
         XCTAssertNil(try JSONDecoder().decode([WorkNote].self, from: Data(json.utf8))[0].noteCategory)
     }
 }
+
+final class DeleteNoteTests: XCTestCase {
+    @MainActor
+    func testDeleteRemovesFromDiskAndRestoreReturnsToTheSamePlace() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let store = NoteStore(fileURL: file)
+        for title in ["Terzo", "Secondo", "Primo"] {
+            var note = WorkNote(); note.title = title; XCTAssertTrue(store.save(note))
+        }
+        let middle = try XCTUnwrap(store.orderedNotes.first { $0.title == "Secondo" })
+        // An unsaved edit is flushed first, so the restored copy is the latest one.
+        var edited = middle; edited.progress = "Ultima riga"
+        XCTAssertTrue(store.stageAutosave(edited))
+        let snapshot = try XCTUnwrap(store.currentNote(id: middle.id))
+        XCTAssertTrue(store.delete(id: middle.id))
+        XCTAssertEqual(NoteStore(fileURL: file).orderedNotes.map(\.title), ["Primo", "Terzo"])
+        XCTAssertTrue(store.restore(snapshot))
+        let reloaded = NoteStore(fileURL: file)
+        XCTAssertEqual(reloaded.orderedNotes.map(\.title), ["Primo", "Secondo", "Terzo"])
+        XCTAssertEqual(reloaded.currentNote(id: middle.id)?.progress, "Ultima riga")
+    }
+}

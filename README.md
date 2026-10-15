@@ -31,7 +31,7 @@ Switching between projects costs the most in the first ten minutes back: rereadi
 - **A widget that does something.** Small, medium and large widgets show your stack in order; tap ↰ on a note to mark its step done without opening the app.
 - **Out of your way.** Lives in the menu bar, opens with **⌃⌥Space** from any app, and never steals focus: the app you were using keeps its menu bar and gets the keyboard back when you press Esc.
 - **Links to your work.** Attach a folder or a URL to each note and open it from there.
-- **Undo everything.** ⌘Z / ⌘⇧Z cover typing and every card action: Done, color, reminders, complete and reopen.
+- **Undo everything.** ⌘Z / ⌘⇧Z cover typing and every card action: Done, color, reminders, complete, reopen and delete (trash icon on the open note, or right‑click a closed one).
 - **English and Italian**, switchable live in Settings (the widget follows).
 - **Private by design.** No account, no network, no analytics. Notes are a plain JSON file on your Mac.
 
